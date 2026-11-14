@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:installer": "powershell -ExecutionPolicy Bypass -File ./scripts/build-installer.ps1",
     "start": "next start",
     "lint": "next lint",
     "db:generate": "prisma generate",
