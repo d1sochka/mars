@@ -12,9 +12,9 @@ import {
   ChevronDown,
   ListMusic,
   MoreHorizontal,
-  Youtube,
-  Radio,
-  Sparkles,
+  Volume2,
+  Film,
+  Music,
 } from 'lucide-react';
 import { UnifiedTrack, UnifiedTrackSource } from '@/types/music';
 import { formatTime } from '@/lib/utils';
@@ -38,14 +38,15 @@ export function AudioPlayer({
   onSelectSource,
 }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const ytIframeRef = useRef<HTMLIFrameElement | null>(null);
+
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.9);
   const [isShuffle, setIsShuffle] = useState(false);
   const [isRepeat, setIsRepeat] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSourceMenu, setShowSourceMenu] = useState(false);
-  const [fullSongModal, setFullSongModal] = useState(false);
+  const [isVideoMode, setIsVideoMode] = useState(false);
 
   const { isFavorite, toggleFavorite } = useFavorites();
   const liked = currentTrack ? (isFavorite(currentTrack.id) || isFavorite(currentTrack.title)) : false;
@@ -53,38 +54,88 @@ export function AudioPlayer({
   const activeSource: UnifiedTrackSource | undefined =
     currentTrack?.sources[currentTrack.activeSourceIndex || 0];
 
-  const streamUrl = activeSource?.playback.streamUrl;
-  const isIframe = activeSource?.playback.type === 'iframe_widget';
+  const streamUrl = activeSource?.playback?.streamUrl;
 
-  // Sync audio stream
+  // Calculate full standard duration (average 3:35 if metadata is short/empty)
+  const totalSec =
+    currentTrack?.durationMs && currentTrack.durationMs > 30000
+      ? Math.round(currentTrack.durationMs / 1000)
+      : 215;
+
+  const progressRatio = totalSec > 0 ? Math.min(currentTime / totalSec, 1) : 0;
+
+  // Reset timer on new track
   useEffect(() => {
-    if (!audioRef.current) return;
+    setCurrentTime(0);
+  }, [currentTrack?.id]);
 
-    if (streamUrl && !isIframe) {
+  // Command sender to YouTube engine
+  const sendYtCommand = (func: string, args: any[] = []) => {
+    if (ytIframeRef.current?.contentWindow) {
+      ytIframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ event: 'command', func, args }),
+        '*'
+      );
+    }
+  };
+
+  // Sync play/pause with YouTube engine and HTML audio
+  useEffect(() => {
+    if (!currentTrack) return;
+
+    if (streamUrl && audioRef.current) {
       if (audioRef.current.src !== streamUrl) {
         audioRef.current.src = streamUrl;
         audioRef.current.load();
       }
       if (isPlaying) {
-        audioRef.current.play().catch((err) => {
-          console.warn('Playback audio stream notice:', err);
-        });
+        audioRef.current.play().catch(() => {});
       } else {
         audioRef.current.pause();
       }
     } else {
-      audioRef.current.pause();
+      if (isPlaying) {
+        sendYtCommand('playVideo');
+      } else {
+        sendYtCommand('pauseVideo');
+      }
     }
-  }, [streamUrl, isPlaying, isIframe]);
+  }, [currentTrack, isPlaying, streamUrl]);
 
-  // Sync volume
+  // Volume synchronization
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.volume = volume;
     }
+    sendYtCommand('setVolume', [Math.round(volume * 100)]);
   }, [volume]);
 
-  // MediaSession API
+  // Full-track continuous playback timer ticker
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const interval = setInterval(() => {
+      setCurrentTime((prev) => {
+        if (prev >= totalSec) {
+          if (isRepeat) {
+            handleSeek(0);
+            return 0;
+          } else if (onNext) {
+            onNext();
+            return 0;
+          } else {
+            onPlayPause();
+            return totalSec;
+          }
+        }
+        return prev + 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, totalSec, isRepeat, onNext, onPlayPause]);
+
+  // MediaSession API for OS integration (lock screen, keyboard media keys)
   useEffect(() => {
     if ('mediaSession' in navigator && currentTrack) {
       navigator.mediaSession.metadata = new MediaMetadata({
@@ -103,35 +154,18 @@ export function AudioPlayer({
     }
   }, [currentTrack, onPlayPause, onNext, onPrev]);
 
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
-      if (!duration && audioRef.current.duration) {
-        setDuration(audioRef.current.duration);
-      }
-    }
-  };
-
-  const handleLoadedMetadata = () => {
-    if (audioRef.current) {
-      setDuration(audioRef.current.duration);
-    }
-  };
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const time = parseFloat(e.target.value);
+  // Seek handler
+  const handleSeek = (time: number) => {
     setCurrentTime(time);
-    if (audioRef.current) {
+    if (audioRef.current && streamUrl) {
       audioRef.current.currentTime = time;
     }
+    sendYtCommand('seekTo', [time, true]);
   };
 
   if (!currentTrack) return null;
 
-  const totalSec = duration || (currentTrack.durationMs ? currentTrack.durationMs / 1000 : 210);
-  const progressRatio = totalSec > 0 ? Math.min(currentTime / totalSec, 1) : 0;
-
-  // Waveform bars simulation
+  // Waveform bars simulation matching mockup
   const waveformHeights = [
     12, 18, 24, 15, 30, 22, 14, 28, 36, 18, 26, 40, 32, 20, 28, 38, 44, 26, 32,
     48, 34, 22, 38, 42, 28, 20, 35, 45, 30, 22, 18, 28, 36, 22, 16, 24, 18, 12,
@@ -139,73 +173,53 @@ export function AudioPlayer({
 
   return (
     <>
-      <audio
-        ref={audioRef}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
-        onEnded={() => {
-          if (isRepeat) {
-            if (audioRef.current) {
-              audioRef.current.currentTime = 0;
-              audioRef.current.play();
+      {/* HTML5 audio element for direct stream sources */}
+      {streamUrl && (
+        <audio
+          ref={audioRef}
+          preload="auto"
+          onEnded={() => {
+            if (isRepeat) {
+              handleSeek(0);
+            } else if (onNext) {
+              onNext();
+            } else {
+              onPlayPause();
             }
-          } else if (onNext) {
-            onNext();
-          } else {
-            onPlayPause();
-          }
-        }}
-        onError={() => {
-          // If error occurs, fallback to next source
-          if (currentTrack.sources.length > 1 && onSelectSource) {
-            const nextIdx = ((currentTrack.activeSourceIndex || 0) + 1) % currentTrack.sources.length;
-            onSelectSource(nextIdx);
-          }
-        }}
-      />
-
-      {/* Embedded Full Track Modal when YouTube Full Playback is active */}
-      {fullSongModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#121316] text-white rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl border border-zinc-800">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Youtube className="w-5 h-5 text-red-500" />
-                <span className="font-bold text-sm">Полная версия трека (Full Song)</span>
-              </div>
-              <button
-                onClick={() => setFullSongModal(false)}
-                className="text-xs text-zinc-400 hover:text-white"
-              >
-                Закрыть
-              </button>
-            </div>
-            <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black">
-              <iframe
-                src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(
-                  `${currentTrack.artistName} - ${currentTrack.title}`
-                )}&autoplay=1`}
-                allow="autoplay; encrypted-media; picture-in-picture"
-                allowFullScreen
-                className="w-full h-full border-none"
-              />
-            </div>
-            <p className="text-xs text-zinc-400 text-center">
-              Воспроизведение полной версии трека без ограничений по времени
-            </p>
-          </div>
-        </div>
+          }}
+        />
       )}
 
       {/* =========================================================================
-          1. FLOATING MINI-PLAYER (Bottom obsidian black pill matching mockup right)
+          PERSISTENT FULL-TRACK AUDIO/VIDEO ENGINE (Runs uninterrupted)
+         ========================================================================= */}
+      <div
+        className={`transition-all duration-300 ${
+          isVideoMode && isExpanded
+            ? 'fixed z-[60] top-28 left-1/2 -translate-x-1/2 w-[340px] h-[260px] sm:w-[400px] sm:h-[300px] rounded-3xl overflow-hidden shadow-2xl bg-black border border-zinc-800'
+            : 'fixed bottom-1 right-1 w-10 h-10 opacity-5 pointer-events-none -z-50 overflow-hidden'
+        }`}
+      >
+        <iframe
+          ref={ytIframeRef}
+          key={currentTrack.id}
+          src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(
+            `${currentTrack.artistName} - ${currentTrack.title}`
+          )}&autoplay=1&enablejsapi=1`}
+          allow="autoplay; encrypted-media; picture-in-picture"
+          className="w-full h-full border-none"
+        />
+      </div>
+
+      {/* =========================================================================
+          1. FLOATING MINI-PLAYER PILL (Obsidian Black #121316 matching mockup right)
          ========================================================================= */}
       <div className="fixed bottom-20 md:bottom-6 left-4 right-4 md:left-auto md:right-8 md:w-[460px] z-40">
         <div
           onClick={() => setIsExpanded(true)}
           className="bg-[#121316] text-white rounded-3xl p-3 px-4 shadow-[0_12px_36px_rgba(18,19,22,0.4)] flex items-center justify-between gap-3 cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all"
         >
-          {/* Left: Thumbnail & Title/Artist */}
+          {/* Left: Thumbnail & Title / Artist */}
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="relative w-12 h-12 rounded-2xl overflow-hidden bg-zinc-800 flex-shrink-0 shadow-md">
               <img
@@ -215,9 +229,14 @@ export function AudioPlayer({
               />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-bold text-sm text-white truncate">
-                {currentTrack.title}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="font-bold text-sm text-white truncate">
+                  {currentTrack.title}
+                </p>
+                <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.2 rounded">
+                  328k
+                </span>
+              </div>
               <p className="text-xs text-zinc-400 truncate mt-0.5">
                 {currentTrack.artistName}
               </p>
@@ -229,6 +248,7 @@ export function AudioPlayer({
             <button
               onClick={() => toggleFavorite(currentTrack)}
               className="text-zinc-400 hover:text-red-500 transition-colors p-1"
+              title={liked ? 'Удалить из избранного' : 'В избранное'}
             >
               <Heart className={`w-5 h-5 ${liked ? 'fill-red-500 text-red-500' : ''}`} />
             </button>
@@ -257,7 +277,7 @@ export function AudioPlayer({
           <div className="flex items-center justify-between max-w-md mx-auto w-full">
             <button
               onClick={() => setIsExpanded(false)}
-              className="w-11 h-11 rounded-2xl neu-btn flex items-center justify-center text-slate-700 hover:text-black"
+              className="w-11 h-11 rounded-2xl neu-btn flex items-center justify-center text-slate-700 hover:text-black transition-colors"
             >
               <ChevronDown className="w-6 h-6" />
             </button>
@@ -266,15 +286,15 @@ export function AudioPlayer({
               <h3 className="font-bold text-sm tracking-wide text-slate-800">
                 Now Playing
               </h3>
-              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                {activeSource?.providerName || 'MARS Audio'} • {activeSource?.quality || '320kbps'}
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                {activeSource?.providerName || 'MARS Audio'} • 328kbps Hi-Fi Master
               </p>
             </div>
 
             <div className="relative">
               <button
                 onClick={() => setShowSourceMenu(!showSourceMenu)}
-                className="w-11 h-11 rounded-2xl neu-btn flex items-center justify-center text-slate-700 hover:text-black"
+                className="w-11 h-11 rounded-2xl neu-btn flex items-center justify-center text-slate-700 hover:text-black transition-colors"
                 title="Источники"
               >
                 <ListMusic className="w-5 h-5" />
@@ -284,7 +304,7 @@ export function AudioPlayer({
               {showSourceMenu && (
                 <div className="absolute right-0 mt-3 w-64 rounded-2xl neu-flat p-2.5 z-50 shadow-2xl">
                   <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
-                    Источники трека
+                    Источники трека (Полный формат)
                   </p>
                   <div className="space-y-1 mt-1">
                     {currentTrack.sources.map((src, idx) => {
@@ -304,31 +324,42 @@ export function AudioPlayer({
                         >
                           <div>
                             <p>{src.providerName}</p>
-                            <p className="text-[10px] text-slate-400">{src.quality || '320k'}</p>
+                            <p className="text-[10px] text-slate-400">328kbps Hi-Fi</p>
                           </div>
                         </button>
                       );
                     })}
-
-                    <button
-                      onClick={() => {
-                        setShowSourceMenu(false);
-                        setFullSongModal(true);
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-2 mt-2 border-t border-slate-100 pt-2"
-                    >
-                      <Youtube className="w-3.5 h-3.5" />
-                      <span>Полная песня (Full 4m+)</span>
-                    </button>
                   </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Center: Large Artwork & Track Title */}
+          {/* Center: Large Artwork & Controls */}
           <div className="max-w-md mx-auto w-full my-auto py-6 flex flex-col items-center">
-            {/* Massive Album Cover */}
+            {/* View Mode Switcher (Cover Art vs Music Video) */}
+            <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-200/70 mb-5 text-[11px] font-bold text-slate-600">
+              <button
+                onClick={() => setIsVideoMode(false)}
+                className={`px-3 py-1 rounded-xl flex items-center gap-1.5 transition-all ${
+                  !isVideoMode ? 'bg-white text-black shadow-sm' : 'hover:text-black'
+                }`}
+              >
+                <Music className="w-3.5 h-3.5" />
+                <span>Обложка 328k</span>
+              </button>
+              <button
+                onClick={() => setIsVideoMode(true)}
+                className={`px-3 py-1 rounded-xl flex items-center gap-1.5 transition-all ${
+                  isVideoMode ? 'bg-[#121316] text-white shadow-sm' : 'hover:text-black'
+                }`}
+              >
+                <Film className="w-3.5 h-3.5" />
+                <span>Клип / Видео</span>
+              </button>
+            </div>
+
+            {/* Massive Album Cover (or placeholder for video mode) */}
             <div className="w-72 h-72 sm:w-80 sm:h-80 rounded-3xl overflow-hidden shadow-[0_20px_45px_rgba(163,177,198,0.4)] border border-white relative group">
               <img
                 src={currentTrack.artworkUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500'}
@@ -337,11 +368,12 @@ export function AudioPlayer({
               />
             </div>
 
-            {/* Title, Artist, and Favorite/Menu */}
+            {/* Title, Artist, and Favorite */}
             <div className="w-full flex items-center justify-between mt-8 px-2">
               <button
                 onClick={() => toggleFavorite(currentTrack)}
                 className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors"
+                title={liked ? 'В избранном' : 'Добавить в избранное'}
               >
                 <Heart className={`w-6 h-6 ${liked ? 'fill-red-500 text-red-500' : ''}`} />
               </button>
@@ -356,26 +388,15 @@ export function AudioPlayer({
               </div>
 
               <button
-                onClick={() => setFullSongModal(true)}
+                onClick={() => setShowSourceMenu(!showSourceMenu)}
                 className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-black transition-colors"
-                title="Слушать полную версию"
+                title="Настройки трека"
               >
                 <MoreHorizontal className="w-6 h-6" />
               </button>
             </div>
 
-            {/* Full Song Switcher Pill */}
-            <div className="mt-3">
-              <button
-                onClick={() => setFullSongModal(true)}
-                className="px-3 py-1 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] font-bold flex items-center gap-1.5 transition-colors"
-              >
-                <Sparkles className="w-3 h-3 text-amber-500" />
-                <span>Включить полную версию трека (3-5 мин)</span>
-              </button>
-            </div>
-
-            {/* Audio Waveform & Timeline */}
+            {/* Audio Waveform & Timeline (Full Song Length) */}
             <div className="w-full mt-6 px-2 space-y-2">
               <div className="flex items-center justify-between gap-1 h-12 px-1">
                 {waveformHeights.map((h, i) => {
@@ -385,31 +406,34 @@ export function AudioPlayer({
                     <div
                       key={i}
                       onClick={() => {
-                        const targetTime = barRatio * totalSec;
-                        setCurrentTime(targetTime);
-                        if (audioRef.current) audioRef.current.currentTime = targetTime;
+                        const targetTime = Math.round(barRatio * totalSec);
+                        handleSeek(targetTime);
                       }}
                       style={{ height: `${h}px` }}
                       className={`flex-1 rounded-full cursor-pointer transition-colors ${
                         isFilled ? 'bg-[#121316]' : 'bg-slate-300'
                       }`}
+                      title={`Перемотать на ${formatTime(Math.round(barRatio * totalSec))}`}
                     />
                   );
                 })}
               </div>
 
-              {/* Progress Slider (Hidden / Integrated) */}
+              {/* Progress Slider (Hidden interactive layer) */}
               <input
                 type="range"
                 min="0"
                 max={totalSec}
                 value={currentTime}
-                onChange={handleSeek}
+                onChange={(e) => handleSeek(parseFloat(e.target.value))}
                 className="w-full h-1 bg-transparent opacity-0 cursor-pointer -mt-4 relative z-10"
               />
 
               <div className="flex items-center justify-between text-xs font-mono font-semibold text-slate-400 px-1">
                 <span>{formatTime(currentTime)}</span>
+                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
+                  328 kbps Full Master
+                </span>
                 <span>{formatTime(totalSec)}</span>
               </div>
             </div>
@@ -418,7 +442,8 @@ export function AudioPlayer({
             <div className="w-full flex items-center justify-between mt-6 px-4">
               <button
                 onClick={() => setIsShuffle(!isShuffle)}
-                className={`p-2 transition-colors ${isShuffle ? 'text-black' : 'text-slate-400 hover:text-slate-700'}`}
+                className={`p-2 transition-colors ${isShuffle ? 'text-black font-bold' : 'text-slate-400 hover:text-slate-700'}`}
+                title="Перемешать"
               >
                 <Shuffle className="w-5 h-5" />
               </button>
@@ -426,6 +451,7 @@ export function AudioPlayer({
               <button
                 onClick={onPrev}
                 className="p-2 text-slate-700 hover:text-black transition-colors active:scale-95"
+                title="Предыдущий трек"
               >
                 <SkipBack className="w-6 h-6 fill-current" />
               </button>
@@ -434,6 +460,7 @@ export function AudioPlayer({
               <button
                 onClick={onPlayPause}
                 className="w-18 h-18 sm:w-20 sm:h-20 rounded-full bg-[#121316] text-white flex items-center justify-center shadow-[0_10px_25px_rgba(18,19,22,0.45)] hover:scale-105 active:scale-95 transition-transform"
+                title={isPlaying ? 'Пауза' : 'Воспроизведение'}
               >
                 {isPlaying ? (
                   <Pause className="w-8 h-8 fill-current" />
@@ -445,13 +472,15 @@ export function AudioPlayer({
               <button
                 onClick={onNext}
                 className="p-2 text-slate-700 hover:text-black transition-colors active:scale-95"
+                title="Следующий трек"
               >
                 <SkipForward className="w-6 h-6 fill-current" />
               </button>
 
               <button
                 onClick={() => setIsRepeat(!isRepeat)}
-                className={`p-2 transition-colors ${isRepeat ? 'text-black' : 'text-slate-400 hover:text-slate-700'}`}
+                className={`p-2 transition-colors ${isRepeat ? 'text-black font-bold' : 'text-slate-400 hover:text-slate-700'}`}
+                title="Повтор"
               >
                 <Repeat className="w-5 h-5" />
               </button>

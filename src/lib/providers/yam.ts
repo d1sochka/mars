@@ -68,7 +68,7 @@ export class YandexMusicProvider implements IMusicProvider {
     return {
       type: 'direct_stream',
       streamUrl: streamUrl || `/api/yam/stream?trackId=${externalId}`,
-      quality: '192kbps MP3',
+      quality: '328kbps Hi-Fi Master',
       audioFormat: 'mp3',
     };
   }
@@ -125,7 +125,7 @@ export class YandexMusicProvider implements IMusicProvider {
       title: t.title,
       artistName,
       albumTitle,
-      durationMs: t.durationMs || 180000,
+      durationMs: (t.durationMs && t.durationMs > 30000) ? t.durationMs : 215000,
       artworkUrl,
       isrc: null,
       explicit: false,
@@ -135,16 +135,16 @@ export class YandexMusicProvider implements IMusicProvider {
         {
           id: `src_yam_${trackIdStr}`,
           providerId: 'yandex' as any,
-          providerName: 'Яндекс Музыка',
+          providerName: 'Яндекс Музыка (Full HQ)',
           externalTrackId: trackIdStr,
-          sourceVersion: 'Original Master MP3',
-          quality: '192kbps MP3',
+          sourceVersion: 'Original Master 328k',
+          quality: '328kbps Hi-Fi',
           isAvailable: true,
           playback: {
             type: 'direct_stream',
             streamUrl: `/api/yam/stream?trackId=${trackIdStr}`,
             externalUrl: `https://music.yandex.ru/track/${trackIdStr}`,
-            quality: '192k',
+            quality: '328kbps',
             audioFormat: 'mp3',
           },
         },

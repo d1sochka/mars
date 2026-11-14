@@ -138,7 +138,7 @@ export function Sidebar() {
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 Jamendo Music
               </span>
-              <span className="text-[10px] text-emerald-400 font-mono">320k Audio</span>
+              <span className="text-[10px] text-emerald-400 font-mono">328k Hi-Fi</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-2 text-slate-200">

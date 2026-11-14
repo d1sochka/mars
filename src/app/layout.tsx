@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 import { FavoritesProvider } from '@/context/FavoritesContext';
@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   title: 'MARS — Multi-Platform Music',
   description: 'Персональная музыкальная платформа, объединяющая музыкальные каталоги со всего мира.',
   manifest: '/manifest.json',
+};
+
+export const viewport: Viewport = {
   themeColor: '#F2F4F8',
 };
 

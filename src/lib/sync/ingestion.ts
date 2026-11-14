@@ -119,7 +119,7 @@ export async function ingestTracks(tracks: UnifiedTrack[]) {
             externalUrl: src.playback.externalUrl,
             quality: src.quality,
             audioFormat: src.playback.audioFormat,
-            sourceVersion: src.sourceVersion,
+            metadata: src.sourceVersion ? JSON.stringify({ sourceVersion: src.sourceVersion }) : undefined,
             isAvailable: true,
           },
         });

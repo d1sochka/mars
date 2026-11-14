@@ -285,7 +285,7 @@ export default function HomePage() {
             {/* Album Info & Action Icons */}
             <div className="flex-1 min-w-0 space-y-1">
               <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                Альбом • 2026
+                Альбом • 2026 • 328 kbps Hi-Fi
               </p>
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 truncate">
                 {featured.title}

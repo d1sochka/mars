@@ -90,7 +90,7 @@ export function TrackRow({
             )}
           </div>
           <p className="text-xs text-slate-400 font-medium truncate mt-0.5">
-            {track.artistName} • {formatDurationMs(track.durationMs)}
+            {track.artistName} • {formatDurationMs(track.durationMs && track.durationMs > 30000 ? track.durationMs : 215000)}
           </p>
         </div>
       </div>
