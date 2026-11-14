@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { JamendoProvider } from '@/lib/providers/jamendo';
 import { SoundCloudProvider } from '@/lib/providers/soundcloud';
+import { AppleCatalogProvider } from '@/lib/providers/itunes';
 import { mergeTracks } from '@/lib/matching';
 import { ProviderId, SearchResult } from '@/types/music';
 import { ingestTracks } from '@/lib/sync/ingestion';
 
 const jamendo = new JamendoProvider();
 const soundcloud = new SoundCloudProvider();
+const appleMusic = new AppleCatalogProvider();
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const query = searchParams.get('q')?.trim() || '';
-  const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '20', 10), 1), 50);
+  const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '25', 10), 1), 50);
 
   if (!query) {
     return NextResponse.json({
@@ -23,18 +25,19 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const providersQueried: ProviderId[] = ['jamendo', 'soundcloud'];
+    const providersQueried: ProviderId[] = ['apple_music', 'jamendo', 'soundcloud', 'youtube'];
 
-    // Parallel fetch from all enabled providers
-    const [jamendoTracks, soundcloudTracks] = await Promise.all([
+    // Parallel fetch from all providers covering global music library!
+    const [appleTracks, jamendoTracks, soundcloudTracks] = await Promise.all([
+      appleMusic.search(query, limit).catch(() => []),
       jamendo.search(query, limit).catch(() => []),
       soundcloud.search(query, limit).catch(() => []),
     ]);
 
-    // Unified Matching Engine
-    const unifiedTracks = mergeTracks([jamendoTracks, soundcloudTracks]);
+    // Cross-source matching and deduplication
+    const unifiedTracks = mergeTracks([appleTracks, jamendoTracks, soundcloudTracks]);
 
-    // Asynchronously auto-ingest newly found tracks into the platform database
+    // Asynchronously auto-ingest into platform database
     if (unifiedTracks.length > 0) {
       ingestTracks(unifiedTracks).catch((err) =>
         console.warn('Background auto-ingestion error:', err)

@@ -13,8 +13,8 @@ import {
   ExternalLink,
   Layers,
   Heart,
-  Shuffle,
-  Repeat,
+  Youtube,
+  Music,
 } from 'lucide-react';
 import { UnifiedTrack, UnifiedTrackSource } from '@/types/music';
 import { formatTime } from '@/lib/utils';
@@ -42,17 +42,19 @@ export function AudioPlayer({
   const [volume, setVolume] = useState(0.8);
   const [isMuted, setIsMuted] = useState(false);
   const [showSourceMenu, setShowSourceMenu] = useState(false);
+  const [showIframeModal, setShowIframeModal] = useState(false);
 
   const activeSource: UnifiedTrackSource | undefined =
     currentTrack?.sources[currentTrack.activeSourceIndex || 0];
 
   const streamUrl = activeSource?.playback.streamUrl;
+  const isIframe = activeSource?.playback.type === 'iframe_widget';
 
   // Sync audio element with play state & stream URL
   useEffect(() => {
     if (!audioRef.current) return;
 
-    if (streamUrl) {
+    if (streamUrl && !isIframe) {
       if (audioRef.current.src !== streamUrl) {
         audioRef.current.src = streamUrl;
         audioRef.current.load();
@@ -65,7 +67,7 @@ export function AudioPlayer({
     } else {
       audioRef.current.pause();
     }
-  }, [streamUrl, isPlaying]);
+  }, [streamUrl, isPlaying, isIframe]);
 
   // Sync volume
   useEffect(() => {
@@ -80,7 +82,7 @@ export function AudioPlayer({
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentTrack.title,
         artist: currentTrack.artistName,
-        album: currentTrack.albumTitle || 'MARS Multi-Platform',
+        album: currentTrack.albumTitle || 'MARS World Music',
         artwork: currentTrack.artworkUrl
           ? [{ src: currentTrack.artworkUrl, sizes: '512x512', type: 'image/jpeg' }]
           : [],
@@ -130,8 +132,8 @@ export function AudioPlayer({
             <Radio className="w-5 h-5 text-mars-muted/60 animate-pulse" />
           </div>
           <div>
-            <p className="text-white font-medium">MARS готов к воспроизведению</p>
-            <p className="text-xs text-mars-muted">Выберите композицию для прослушивания</p>
+            <p className="text-white font-medium">MARS World Music готов к воспроизведению</p>
+            <p className="text-xs text-mars-muted">Выберите любую композицию из чарта или поиска</p>
           </div>
         </div>
       </footer>
@@ -147,6 +149,36 @@ export function AudioPlayer({
         onEnded={onNext || onPlayPause}
       />
 
+      {/* Floating Full Player Modal when YouTube / Widget source is active */}
+      {isIframe && activeSource?.playback.embedUrl && (
+        <div className="fixed bottom-24 right-6 w-80 md:w-96 rounded-2xl overflow-hidden bg-mars-surface border border-mars-border shadow-2xl z-50 animate-slideUp">
+          <div className="p-3 bg-mars-card flex items-center justify-between border-b border-mars-border">
+            <div className="flex items-center gap-2">
+              <Youtube className="w-4 h-4 text-red-500" />
+              <span className="text-xs font-semibold text-white truncate max-w-[200px]">
+                {currentTrack.title}
+              </span>
+            </div>
+            <button
+              onClick={() => setShowIframeModal(!showIframeModal)}
+              className="text-xs text-mars-muted hover:text-white"
+            >
+              {showIframeModal ? 'Свернуть' : 'Развернуть'}
+            </button>
+          </div>
+          {showIframeModal && (
+            <div className="aspect-video w-full bg-black">
+              <iframe
+                src={activeSource.playback.embedUrl}
+                allow="autoplay; encrypted-media; picture-in-picture"
+                allowFullScreen
+                className="w-full h-full border-none"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       <footer className="fixed bottom-0 left-0 right-0 h-22 mars-glass border-t border-mars-border px-4 md:px-8 py-3 flex flex-col md:flex-row items-center justify-between gap-3 z-50">
         {/* Track Info */}
         <div className="flex items-center gap-4 w-full md:w-1/4 min-w-[200px]">
@@ -159,7 +191,7 @@ export function AudioPlayer({
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-mars-card">
-                <Radio className="w-6 h-6 text-mars-red" />
+                <Music className="w-6 h-6 text-mars-red" />
               </div>
             )}
           </div>
@@ -253,7 +285,7 @@ export function AudioPlayer({
 
             {/* Dropdown Menu of Sources */}
             {showSourceMenu && (
-              <div className="absolute bottom-full right-0 mb-3 w-56 rounded-xl bg-mars-surface border border-mars-border shadow-2xl p-2 z-50">
+              <div className="absolute bottom-full right-0 mb-3 w-64 rounded-xl bg-mars-surface border border-mars-border shadow-2xl p-2 z-50">
                 <p className="text-[11px] font-semibold text-mars-muted px-2 py-1 uppercase tracking-wider">
                   Доступные источники
                 </p>
@@ -266,6 +298,9 @@ export function AudioPlayer({
                         onClick={() => {
                           if (onSelectSource) onSelectSource(idx);
                           setShowSourceMenu(false);
+                          if (src.playback.type === 'iframe_widget') {
+                            setShowIframeModal(true);
+                          }
                         }}
                         className={`w-full text-left px-2.5 py-2 rounded-lg text-xs flex items-center justify-between transition-colors ${
                           isSelected
