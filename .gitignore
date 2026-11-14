@@ -15,8 +15,11 @@
 /.next/
 /out/
 
-# Production
+# Build & Dist
 /build
+/dist
+/scratch
+*.exe
 
 # Misc
 .DS_Store

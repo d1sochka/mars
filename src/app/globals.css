@@ -14,9 +14,12 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   overflow-x: hidden;
   user-select: none;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Custom Soft-UI & Neumorphism */
+/* =========================================================================
+   LIGHT NEUMORPHISM (Soft-UI from user reference mockup)
+   ========================================================================= */
 .neu-flat {
   background: #FFFFFF;
   box-shadow: 8px 8px 20px rgba(163, 177, 198, 0.25), -8px -8px 20px rgba(255, 255, 255, 0.95);
@@ -54,6 +57,42 @@ body {
   background: #ECEFF4;
   box-shadow: inset 2px 2px 5px rgba(163, 177, 198, 0.28), inset -2px -2px 5px rgba(255, 255, 255, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* =========================================================================
+   DARK NEUMORPHISM (Obsidian Night Soft-UI)
+   ========================================================================= */
+.dark body {
+  background-color: #0E1015 !important;
+  color: #F2F4F8 !important;
+}
+
+.dark .neu-flat {
+  background: #16181F !important;
+  box-shadow: 6px 6px 18px rgba(0, 0, 0, 0.5), -6px -6px 18px rgba(35, 38, 48, 0.3) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #F8FAFC !important;
+}
+
+.dark .neu-card {
+  background: #16181F !important;
+  box-shadow: 6px 6px 18px rgba(0, 0, 0, 0.45), -6px -6px 18px rgba(35, 38, 48, 0.25) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #F8FAFC !important;
+}
+
+.dark .neu-btn {
+  background: #181B22 !important;
+  box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.5), -4px -4px 12px rgba(40, 44, 56, 0.35) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #E2E8F0 !important;
+}
+
+.dark .neu-input {
+  background: #12141A !important;
+  box-shadow: inset 2px 2px 6px rgba(0, 0, 0, 0.65), inset -2px -2px 6px rgba(40, 44, 56, 0.25) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #F8FAFC !important;
 }
 
 /* Obsidian Contrast Pill (From Mockup) */
