@@ -113,14 +113,27 @@ export default function HomePage() {
 
   // Application Theme state
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
+  const [yamToken, setYamToken] = useState('');
+  const [isTokenSaved, setIsTokenSaved] = useState(false);
 
   useEffect(() => {
     try {
       const saved = (localStorage.getItem('mars_theme') as 'light' | 'dark' | 'system') || 'light';
       setTheme(saved);
       applyTheme(saved);
+
+      const savedToken = localStorage.getItem('mars_yam_token') || '';
+      setYamToken(savedToken);
     } catch (e) {}
   }, []);
+
+  const handleSaveToken = () => {
+    try {
+      localStorage.setItem('mars_yam_token', yamToken.trim());
+      setIsTokenSaved(true);
+      setTimeout(() => setIsTokenSaved(false), 2500);
+    } catch (e) {}
+  };
 
   const applyTheme = (t: 'light' | 'dark' | 'system') => {
     setTheme(t);
@@ -529,13 +542,65 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Section 3: Музыкальные интеграции */}
+            {/* Section 3: Яндекс Музыка (MarshalX API Integration) */}
+            <div className="neu-card rounded-3xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500 text-black font-black flex items-center justify-center text-sm shadow-sm">
+                    Я
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900 dark:text-white">Яндекс Музыка (MarshalX API)</h3>
+                    <p className="text-[11px] text-slate-400">Полный доступ к миллионам треков без 30с ограничений</p>
+                  </div>
+                </div>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  yamToken ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-500/30' : 'bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-slate-400'
+                }`}>
+                  {yamToken ? 'Подключено 328k' : 'Демо (30 сек)'}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  OAuth Токен Яндекс Музыки
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    placeholder="Вставьте ваш токен (y0_AgAAAA...)"
+                    value={yamToken}
+                    onChange={(e) => setYamToken(e.target.value)}
+                    className="flex-1 px-4 py-2.5 rounded-2xl neu-pressed text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 bg-transparent focus:outline-none"
+                  />
+                  <button
+                    onClick={handleSaveToken}
+                    className="px-4 py-2.5 rounded-2xl bg-[#121316] dark:bg-white text-white dark:text-[#121316] text-xs font-bold hover:scale-105 active:scale-95 transition-all shadow-md"
+                  >
+                    {isTokenSaved ? '✓ Сохранено' : 'Сохранить'}
+                  </button>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                  <span>Нет токена? Получите его в 1 клик через официальный сервис:</span>
+                  <a
+                    href="https://ym-token.marshal.dev/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-amber-600 dark:text-amber-400 font-bold hover:underline"
+                  >
+                    ym-token.marshal.dev ↗
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 4: Музыкальные интеграции */}
             <div className="neu-card rounded-3xl p-5 space-y-3">
               <h3 className="font-bold text-sm text-slate-900 dark:text-white">Подключенные сервисы</h3>
               <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
                 <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-800/60 flex items-center gap-2 text-slate-700 dark:text-slate-200">
                   <Check className="w-4 h-4 text-emerald-500" />
-                  <span>Яндекс Музыка (YAM)</span>
+                  <span>Яндекс Музыка (MarshalX)</span>
                 </div>
                 <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-zinc-800/60 flex items-center gap-2 text-slate-700 dark:text-slate-200">
                   <Check className="w-4 h-4 text-emerald-500" />
@@ -552,10 +617,10 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Section 4: О программе */}
+            {/* Section 5: О программе */}
             <div className="neu-card rounded-3xl p-5 space-y-2 text-xs text-slate-500 dark:text-slate-400">
               <p className="font-bold text-slate-800 dark:text-slate-200">MARS Multi-Platform Music Aggregator</p>
-              <p>Версия: 1.2.0 (Windows Standalone + PWA)</p>
+              <p>Версия: 1.2.1 (MarshalX Engine + Windows Installer)</p>
               <p>Репозиторий проекта: <a href="https://github.com/d1sochka/mars" target="_blank" rel="noreferrer" className="text-blue-500 underline">github.com/d1sochka/mars</a></p>
             </div>
           </div>

@@ -26,4 +26,4 @@ New-Item -ItemType Directory -Path "$baseDir\dist" -Force | Out-Null
 
 Write-Host ""
 Write-Host "SUCCESS! Installer created at:" -ForegroundColor Green
-Write-Host "$baseDir\dist\MARS_Setup_v1.2.0.exe" -ForegroundColor White
+Write-Host "$baseDir\dist\MARS_Setup_v1.2.1.exe" -ForegroundColor White

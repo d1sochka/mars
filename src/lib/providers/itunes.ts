@@ -108,6 +108,7 @@ export class AppleCatalogProvider implements IMusicProvider {
               isAvailable: true,
               playback: {
                 type: 'direct_stream' as const,
+                streamUrl: `/api/yam/stream?q=${encodeURIComponent(`${item.artistName} ${item.name}`)}`,
                 externalUrl: item.url,
                 quality: '328kbps',
                 audioFormat: 'mp3',
@@ -169,6 +170,7 @@ export class AppleCatalogProvider implements IMusicProvider {
           isAvailable: true,
           playback: {
             type: 'direct_stream',
+            streamUrl: `/api/yam/stream?q=${encodeURIComponent(`${item.artistName} ${item.trackName}`)}`,
             externalUrl: item.trackViewUrl,
             quality: '328kbps',
             audioFormat: 'mp3',

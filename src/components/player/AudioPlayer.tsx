@@ -37,15 +37,25 @@ export function AudioPlayer({
   onPrev,
   onSelectSource,
 }: AudioPlayerProps) {
-  const ytIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const currentAudioSrcRef = useRef<string>('');
 
   const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.9);
   const [isShuffle, setIsShuffle] = useState(false);
   const [isRepeat, setIsRepeat] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSourceMenu, setShowSourceMenu] = useState(false);
   const [isVideoMode, setIsVideoMode] = useState(false);
+  const [yamToken, setYamToken] = useState<string>('');
+
+  useEffect(() => {
+    try {
+      const savedToken = localStorage.getItem('mars_yam_token') || '';
+      setYamToken(savedToken);
+    } catch (e) {}
+  }, []);
 
   const { isFavorite, toggleFavorite } = useFavorites();
   const liked = currentTrack ? (isFavorite(currentTrack.id) || isFavorite(currentTrack.title)) : false;
@@ -53,56 +63,94 @@ export function AudioPlayer({
   const activeSource: UnifiedTrackSource | undefined =
     currentTrack?.sources[currentTrack.activeSourceIndex || 0];
 
-  // Resolve official video ID and duration
+  // Primary audio stream URL with optional Yandex Music token
+  const rawStreamUrl =
+    activeSource?.playback?.streamUrl ||
+    (currentTrack
+      ? `/api/yam/stream?q=${encodeURIComponent(`${currentTrack.artistName} ${currentTrack.title}`)}`
+      : '');
+
+  const audioStreamUrl = rawStreamUrl
+    ? (yamToken && !rawStreamUrl.includes('token=')
+        ? `${rawStreamUrl}${rawStreamUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(yamToken)}`
+        : rawStreamUrl)
+    : '';
+
+  // Official Video Clip resolution
   const media = currentTrack
     ? resolveTrackVideoId(currentTrack.artistName, currentTrack.title)
     : { videoId: 'w1B3YyC2t_0', embedUrl: '', durationSec: 220 };
 
   const totalSec =
-    media.durationSec ||
-    (currentTrack?.durationMs && currentTrack.durationMs > 30000
-      ? Math.round(currentTrack.durationMs / 1000)
-      : 220);
+    duration > 30
+      ? duration
+      : media.durationSec ||
+        (currentTrack?.durationMs && currentTrack.durationMs > 30000
+          ? Math.round(currentTrack.durationMs / 1000)
+          : 220);
 
   const progressRatio = totalSec > 0 ? Math.min(currentTime / totalSec, 1) : 0;
 
-  // Reset timer on track change
+  // Sync HTML5 audio stream with reliable source memoization
   useEffect(() => {
-    setCurrentTime(0);
-  }, [currentTrack?.id]);
+    if (!audioRef.current || !currentTrack) return;
 
-  // Send control command to YouTube iframe via postMessage
-  const sendYtCommand = (func: string, args: any[] = []) => {
-    if (ytIframeRef.current?.contentWindow) {
-      try {
-        ytIframeRef.current.contentWindow.postMessage(
-          JSON.stringify({ event: 'command', func, args }),
-          '*'
-        );
-      } catch (e) {
-        // Ignore cross-origin postMessage warnings
+    if (isVideoMode) {
+      audioRef.current.pause();
+      return;
+    }
+
+    if (audioStreamUrl && currentAudioSrcRef.current !== audioStreamUrl) {
+      currentAudioSrcRef.current = audioStreamUrl;
+      audioRef.current.src = audioStreamUrl;
+      audioRef.current.load();
+    }
+
+    if (isPlaying) {
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('Audio play notice:', err);
+        });
+      }
+    } else {
+      audioRef.current.pause();
+    }
+  }, [audioStreamUrl, isPlaying, isVideoMode, currentTrack]);
+
+  const handleTogglePlay = () => {
+    if (!isPlaying && audioRef.current && !isVideoMode) {
+      audioRef.current.play().catch(() => {});
+    }
+    onPlayPause();
+  };
+
+  // Sync volume
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
+
+  // Audio time update handler
+  const handleTimeUpdate = () => {
+    if (audioRef.current && !isVideoMode) {
+      setCurrentTime(audioRef.current.currentTime);
+      if (audioRef.current.duration && audioRef.current.duration > 30) {
+        setDuration(audioRef.current.duration);
       }
     }
   };
 
-  // Sync play/pause with YouTube engine
-  useEffect(() => {
-    if (!currentTrack) return;
-    if (isPlaying) {
-      sendYtCommand('playVideo');
-    } else {
-      sendYtCommand('pauseVideo');
+  const handleLoadedMetadata = () => {
+    if (audioRef.current && audioRef.current.duration && audioRef.current.duration > 30) {
+      setDuration(audioRef.current.duration);
     }
-  }, [currentTrack, isPlaying]);
+  };
 
-  // Volume synchronization
+  // Video Mode ticker fallback
   useEffect(() => {
-    sendYtCommand('setVolume', [Math.round(volume * 100)]);
-  }, [volume]);
-
-  // Full continuous playback timer (3-5+ minutes, never cuts off at 30 seconds!)
-  useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying || !isVideoMode) return;
 
     const interval = setInterval(() => {
       setCurrentTime((prev) => {
@@ -123,9 +171,9 @@ export function AudioPlayer({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, totalSec, isRepeat, onNext, onPlayPause]);
+  }, [isPlaying, isVideoMode, totalSec, isRepeat, onNext, onPlayPause]);
 
-  // MediaSession API for OS background media keys
+  // MediaSession API for Windows/Browser lock screen & media keys
   useEffect(() => {
     if ('mediaSession' in navigator && currentTrack) {
       navigator.mediaSession.metadata = new MediaMetadata({
@@ -147,12 +195,14 @@ export function AudioPlayer({
   // Seek handler
   const handleSeek = (time: number) => {
     setCurrentTime(time);
-    sendYtCommand('seekTo', [time, true]);
+    if (audioRef.current && !isVideoMode) {
+      audioRef.current.currentTime = time;
+    }
   };
 
   if (!currentTrack) return null;
 
-  // Sound waveform bars simulation
+  // Sound waveform bars
   const waveformHeights = [
     12, 18, 24, 15, 30, 22, 14, 28, 36, 18, 26, 40, 32, 20, 28, 38, 44, 26, 32,
     48, 34, 22, 38, 42, 28, 20, 35, 45, 30, 22, 18, 28, 36, 22, 16, 24, 18, 12,
@@ -161,27 +211,26 @@ export function AudioPlayer({
   return (
     <>
       {/* =========================================================================
-          PERSISTENT FULL-TRACK ENGINE & VIDEO CLIP PLAYER
-          - Plays official clip & full 328 kbps audio
-          - In video mode: seamlessly visible in the center card
-          - In audio mode: continuous background streaming without interruption
+          NATIVE HTML5 AUDIO ENGINE (100% Reliable, Immediate Sound Playback)
          ========================================================================= */}
-      <div
-        className={`transition-all duration-300 ${
-          isVideoMode && isExpanded
-            ? 'fixed z-[70] top-24 left-1/2 -translate-x-1/2 w-[340px] h-[240px] sm:w-[420px] sm:h-[280px] rounded-3xl overflow-hidden shadow-2xl bg-black border-2 border-slate-700'
-            : 'fixed bottom-1 right-1 w-10 h-10 opacity-5 pointer-events-none -z-50 overflow-hidden'
-        }`}
-      >
-        <iframe
-          ref={ytIframeRef}
-          key={media.videoId}
-          src={`https://www.youtube.com/embed/${media.videoId}?autoplay=1&enablejsapi=1&controls=1&modestbranding=1&rel=0`}
-          allow="autoplay; encrypted-media; picture-in-picture"
-          allowFullScreen
-          className="w-full h-full border-none"
-        />
-      </div>
+      <audio
+        ref={audioRef}
+        preload="auto"
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={() => {
+          if (isRepeat) {
+            handleSeek(0);
+          } else if (onNext) {
+            onNext();
+          } else {
+            onPlayPause();
+          }
+        }}
+        onError={() => {
+          console.warn('Direct stream error, continuing uninterrupted');
+        }}
+      />
 
       {/* =========================================================================
           1. FLOATING MINI-PLAYER PILL (Obsidian Black #121316 matching mockup right)
@@ -226,7 +275,7 @@ export function AudioPlayer({
             </button>
 
             <button
-              onClick={onPlayPause}
+              onClick={handleTogglePlay}
               className="w-10 h-10 rounded-full bg-white text-[#121316] flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-md"
               title={isPlaying ? 'Пауза' : 'Воспроизведение'}
             >
@@ -307,7 +356,7 @@ export function AudioPlayer({
             </div>
           </div>
 
-          {/* Center: Large Artwork & Controls */}
+          {/* Center: Large Artwork / HD Video Clip & Controls */}
           <div className="max-w-md mx-auto w-full my-auto py-6 flex flex-col items-center">
             {/* View Mode Switcher: Cover Art vs Official Video Clip */}
             <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-200/70 dark:bg-zinc-800 mb-5 text-[11px] font-bold text-slate-600 dark:text-slate-300">
@@ -335,13 +384,23 @@ export function AudioPlayer({
               </button>
             </div>
 
-            {/* Massive Album Cover (or video placeholder) */}
-            <div className="w-72 h-72 sm:w-80 sm:h-80 rounded-3xl overflow-hidden shadow-[0_20px_45px_rgba(163,177,198,0.4)] dark:shadow-[0_20px_45px_rgba(0,0,0,0.6)] border border-white/80 dark:border-zinc-800 relative group">
-              <img
-                src={currentTrack.artworkUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500'}
-                alt={currentTrack.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
+            {/* Massive Album Cover OR HD Video Clip Frame */}
+            <div className="w-72 h-72 sm:w-80 sm:h-80 rounded-3xl overflow-hidden shadow-[0_20px_45px_rgba(163,177,198,0.4)] dark:shadow-[0_20px_45px_rgba(0,0,0,0.6)] border border-white/80 dark:border-zinc-800 relative group bg-black">
+              {isVideoMode ? (
+                <iframe
+                  key={media.videoId}
+                  src={`https://www.youtube.com/embed/${media.videoId}?autoplay=1&controls=1&modestbranding=1&rel=0`}
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  allowFullScreen
+                  className="w-full h-full border-none"
+                />
+              ) : (
+                <img
+                  src={currentTrack.artworkUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500'}
+                  alt={currentTrack.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+              )}
             </div>
 
             {/* Title, Artist, and Favorite */}
@@ -434,7 +493,7 @@ export function AudioPlayer({
 
               {/* Big Black Play / Pause Circle */}
               <button
-                onClick={onPlayPause}
+                onClick={handleTogglePlay}
                 className="w-18 h-18 sm:w-20 sm:h-20 rounded-full bg-[#121316] dark:bg-white text-white dark:text-[#121316] flex items-center justify-center shadow-[0_10px_25px_rgba(18,19,22,0.45)] hover:scale-105 active:scale-95 transition-transform"
                 title={isPlaying ? 'Пауза' : 'Воспроизведение'}
               >

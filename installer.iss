@@ -1,7 +1,7 @@
 ; MARS Multi-Platform Music Aggregator Inno Setup Script
 
 #define MyAppName "MARS"
-#define MyAppVersion "1.2.0"
+#define MyAppVersion "1.2.1"
 #define MyAppPublisher "MARS Audio"
 #define MyAppURL "https://mars.audio"
 #define MyAppExeName "MARS.exe"
@@ -18,7 +18,7 @@ DefaultDirName={localappdata}\Programs\{#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=e:\MARS\dist
-OutputBaseFilename=MARS_Setup_v1.2.0
+OutputBaseFilename=MARS_Setup_v1.2.1
 SetupIconFile=e:\MARS\build\mars.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma2/ultra64

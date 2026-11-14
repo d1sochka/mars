@@ -154,7 +154,7 @@ export function resolveTrackVideoId(artist: string, title: string): ResolvedMedi
     const item = VERIFIED_TRACK_VIDEOS[fullKey];
     return {
       videoId: item.id,
-      embedUrl: `https://www.youtube.com/embed/${item.id}?autoplay=1&enablejsapi=1&origin=http://localhost:3000`,
+      embedUrl: `https://www.youtube-nocookie.com/embed/${item.id}?autoplay=1&controls=1&rel=0`,
       durationSec: item.duration,
     };
   }
@@ -164,7 +164,7 @@ export function resolveTrackVideoId(artist: string, title: string): ResolvedMedi
     const item = VERIFIED_TRACK_VIDEOS[normTitle];
     return {
       videoId: item.id,
-      embedUrl: `https://www.youtube.com/embed/${item.id}?autoplay=1&enablejsapi=1&origin=http://localhost:3000`,
+      embedUrl: `https://www.youtube-nocookie.com/embed/${item.id}?autoplay=1&controls=1&rel=0`,
       durationSec: item.duration,
     };
   }
@@ -174,7 +174,7 @@ export function resolveTrackVideoId(artist: string, title: string): ResolvedMedi
     if (key.includes(normTitle) || normTitle.includes(key)) {
       return {
         videoId: item.id,
-        embedUrl: `https://www.youtube.com/embed/${item.id}?autoplay=1&enablejsapi=1&origin=http://localhost:3000`,
+        embedUrl: `https://www.youtube-nocookie.com/embed/${item.id}?autoplay=1&controls=1&rel=0`,
         durationSec: item.duration,
       };
     }
@@ -190,7 +190,7 @@ export function resolveTrackVideoId(artist: string, title: string): ResolvedMedi
 
   return {
     videoId: fallbackId,
-    embedUrl: `https://www.youtube.com/embed/${fallbackId}?autoplay=1&enablejsapi=1&origin=http://localhost:3000`,
+    embedUrl: `https://www.youtube-nocookie.com/embed/${fallbackId}?autoplay=1&controls=1&rel=0`,
     durationSec: 220, // 3:40 full song length
   };
 }
