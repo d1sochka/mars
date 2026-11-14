@@ -12,13 +12,13 @@ import {
   ChevronDown,
   ListMusic,
   MoreHorizontal,
-  Layers,
-  Volume2,
-  VolumeX,
-  ExternalLink,
+  Youtube,
+  Radio,
+  Sparkles,
 } from 'lucide-react';
 import { UnifiedTrack, UnifiedTrackSource } from '@/types/music';
 import { formatTime } from '@/lib/utils';
+import { useFavorites } from '@/context/FavoritesContext';
 
 interface AudioPlayerProps {
   currentTrack: UnifiedTrack | null;
@@ -40,24 +40,27 @@ export function AudioPlayer({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.85);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isLiked, setIsLiked] = useState(false);
+  const [volume, setVolume] = useState(0.9);
   const [isShuffle, setIsShuffle] = useState(false);
   const [isRepeat, setIsRepeat] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSourceMenu, setShowSourceMenu] = useState(false);
+  const [fullSongModal, setFullSongModal] = useState(false);
+
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const liked = currentTrack ? (isFavorite(currentTrack.id) || isFavorite(currentTrack.title)) : false;
 
   const activeSource: UnifiedTrackSource | undefined =
     currentTrack?.sources[currentTrack.activeSourceIndex || 0];
 
   const streamUrl = activeSource?.playback.streamUrl;
+  const isIframe = activeSource?.playback.type === 'iframe_widget';
 
   // Sync audio stream
   useEffect(() => {
     if (!audioRef.current) return;
 
-    if (streamUrl) {
+    if (streamUrl && !isIframe) {
       if (audioRef.current.src !== streamUrl) {
         audioRef.current.src = streamUrl;
         audioRef.current.load();
@@ -72,14 +75,14 @@ export function AudioPlayer({
     } else {
       audioRef.current.pause();
     }
-  }, [streamUrl, isPlaying]);
+  }, [streamUrl, isPlaying, isIframe]);
 
   // Sync volume
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : volume;
+      audioRef.current.volume = volume;
     }
-  }, [volume, isMuted]);
+  }, [volume]);
 
   // MediaSession API
   useEffect(() => {
@@ -125,7 +128,7 @@ export function AudioPlayer({
 
   if (!currentTrack) return null;
 
-  const totalSec = duration || (currentTrack.durationMs ? currentTrack.durationMs / 1000 : 180);
+  const totalSec = duration || (currentTrack.durationMs ? currentTrack.durationMs / 1000 : 210);
   const progressRatio = totalSec > 0 ? Math.min(currentTime / totalSec, 1) : 0;
 
   // Waveform bars simulation
@@ -140,7 +143,18 @@ export function AudioPlayer({
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
-        onEnded={onNext || onPlayPause}
+        onEnded={() => {
+          if (isRepeat) {
+            if (audioRef.current) {
+              audioRef.current.currentTime = 0;
+              audioRef.current.play();
+            }
+          } else if (onNext) {
+            onNext();
+          } else {
+            onPlayPause();
+          }
+        }}
         onError={() => {
           // If error occurs, fallback to next source
           if (currentTrack.sources.length > 1 && onSelectSource) {
@@ -149,6 +163,39 @@ export function AudioPlayer({
           }
         }}
       />
+
+      {/* Embedded Full Track Modal when YouTube Full Playback is active */}
+      {fullSongModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#121316] text-white rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl border border-zinc-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Youtube className="w-5 h-5 text-red-500" />
+                <span className="font-bold text-sm">Полная версия трека (Full Song)</span>
+              </div>
+              <button
+                onClick={() => setFullSongModal(false)}
+                className="text-xs text-zinc-400 hover:text-white"
+              >
+                Закрыть
+              </button>
+            </div>
+            <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black">
+              <iframe
+                src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(
+                  `${currentTrack.artistName} - ${currentTrack.title}`
+                )}&autoplay=1`}
+                allow="autoplay; encrypted-media; picture-in-picture"
+                allowFullScreen
+                className="w-full h-full border-none"
+              />
+            </div>
+            <p className="text-xs text-zinc-400 text-center">
+              Воспроизведение полной версии трека без ограничений по времени
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* =========================================================================
           1. FLOATING MINI-PLAYER (Bottom obsidian black pill matching mockup right)
@@ -180,10 +227,10 @@ export function AudioPlayer({
           {/* Right: Heart & Black/White Play-Pause Button */}
           <div className="flex items-center gap-3 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
             <button
-              onClick={() => setIsLiked(!isLiked)}
+              onClick={() => toggleFavorite(currentTrack)}
               className="text-zinc-400 hover:text-red-500 transition-colors p-1"
             >
-              <Heart className={`w-5 h-5 ${isLiked ? 'fill-red-500 text-red-500' : ''}`} />
+              <Heart className={`w-5 h-5 ${liked ? 'fill-red-500 text-red-500' : ''}`} />
             </button>
 
             <button
@@ -215,9 +262,14 @@ export function AudioPlayer({
               <ChevronDown className="w-6 h-6" />
             </button>
 
-            <h3 className="font-bold text-sm tracking-wide text-slate-800">
-              Now Playing
-            </h3>
+            <div className="text-center">
+              <h3 className="font-bold text-sm tracking-wide text-slate-800">
+                Now Playing
+              </h3>
+              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                {activeSource?.providerName || 'MARS Audio'} • {activeSource?.quality || '320kbps'}
+              </p>
+            </div>
 
             <div className="relative">
               <button
@@ -230,9 +282,9 @@ export function AudioPlayer({
 
               {/* Source Dropdown Menu */}
               {showSourceMenu && (
-                <div className="absolute right-0 mt-3 w-56 rounded-2xl neu-flat p-2.5 z-50">
+                <div className="absolute right-0 mt-3 w-64 rounded-2xl neu-flat p-2.5 z-50 shadow-2xl">
                   <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
-                    Источник трека
+                    Источники трека
                   </p>
                   <div className="space-y-1 mt-1">
                     {currentTrack.sources.map((src, idx) => {
@@ -244,7 +296,7 @@ export function AudioPlayer({
                             if (onSelectSource) onSelectSource(idx);
                             setShowSourceMenu(false);
                           }}
-                          className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors ${
+                          className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors ${
                             isSelected
                               ? 'bg-[#121316] text-white shadow-md'
                               : 'hover:bg-slate-100 text-slate-700'
@@ -252,11 +304,22 @@ export function AudioPlayer({
                         >
                           <div>
                             <p>{src.providerName}</p>
-                            <p className="text-[10px] text-slate-400">{src.quality || 'Hi-Fi'}</p>
+                            <p className="text-[10px] text-slate-400">{src.quality || '320k'}</p>
                           </div>
                         </button>
                       );
                     })}
+
+                    <button
+                      onClick={() => {
+                        setShowSourceMenu(false);
+                        setFullSongModal(true);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-2 mt-2 border-t border-slate-100 pt-2"
+                    >
+                      <Youtube className="w-3.5 h-3.5" />
+                      <span>Полная песня (Full 4m+)</span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -277,10 +340,10 @@ export function AudioPlayer({
             {/* Title, Artist, and Favorite/Menu */}
             <div className="w-full flex items-center justify-between mt-8 px-2">
               <button
-                onClick={() => setIsLiked(!isLiked)}
+                onClick={() => toggleFavorite(currentTrack)}
                 className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors"
               >
-                <Heart className={`w-6 h-6 ${isLiked ? 'fill-red-500 text-red-500' : ''}`} />
+                <Heart className={`w-6 h-6 ${liked ? 'fill-red-500 text-red-500' : ''}`} />
               </button>
 
               <div className="text-center min-w-0 flex-1 px-4">
@@ -292,13 +355,28 @@ export function AudioPlayer({
                 </p>
               </div>
 
-              <button className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-black transition-colors">
+              <button
+                onClick={() => setFullSongModal(true)}
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-black transition-colors"
+                title="Слушать полную версию"
+              >
                 <MoreHorizontal className="w-6 h-6" />
               </button>
             </div>
 
+            {/* Full Song Switcher Pill */}
+            <div className="mt-3">
+              <button
+                onClick={() => setFullSongModal(true)}
+                className="px-3 py-1 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 text-[11px] font-bold flex items-center gap-1.5 transition-colors"
+              >
+                <Sparkles className="w-3 h-3 text-amber-500" />
+                <span>Включить полную версию трека (3-5 мин)</span>
+              </button>
+            </div>
+
             {/* Audio Waveform & Timeline */}
-            <div className="w-full mt-8 px-2 space-y-2">
+            <div className="w-full mt-6 px-2 space-y-2">
               <div className="flex items-center justify-between gap-1 h-12 px-1">
                 {waveformHeights.map((h, i) => {
                   const barRatio = i / waveformHeights.length;

@@ -17,24 +17,86 @@ import {
   Sparkles,
   Loader2,
   RefreshCw,
+  Heart,
+  Music2,
+  Radio,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { UnifiedTrack } from '@/types/music';
 import { TrackRow } from '@/components/track/TrackRow';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
 import { useAuth } from '@/context/AuthContext';
+import { useFavorites } from '@/context/FavoritesContext';
+import { ArtistModal, ArtistData } from '@/components/artist/ArtistModal';
+
+const POPULAR_ARTISTS: ArtistData[] = [
+  {
+    id: 'brambles',
+    name: 'Brambles',
+    genre: 'Ambient / Neoclassical',
+    listeners: '420 000',
+    avatarUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'miyagi',
+    name: 'Miyagi & Эндшпиль',
+    genre: 'Hip-Hop / Reggae',
+    listeners: '5 400 000',
+    avatarUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'the_weeknd',
+    name: 'The Weeknd',
+    genre: 'R&B / Synthpop',
+    listeners: '110 000 000',
+    avatarUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=500&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'billie_eilish',
+    name: 'Billie Eilish',
+    genre: 'Alt Pop / Indie',
+    listeners: '94 000 000',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'queen',
+    name: 'Queen',
+    genre: 'Classic Rock',
+    listeners: '52 000 000',
+    avatarUrl: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=500&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'kish',
+    name: 'Король и Шут',
+    genre: 'Punk Rock',
+    listeners: '3 800 000',
+    avatarUrl: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'daft_punk',
+    name: 'Daft Punk',
+    genre: 'Electronic / French House',
+    listeners: '28 000 000',
+    avatarUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&auto=format&fit=crop&q=80',
+  },
+];
 
 export default function HomePage() {
   const { user, openAuthModal, triggerSync, isSyncing } = useAuth();
+  const { favorites } = useFavorites();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<UnifiedTrack[]>([]);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  // Active Tab: 'yam' (Яндекс Музыка), 'new' (Новинки), 'rock', 'electronic', 'hiphop'
+  // Active Feed: 'yam' (Яндекс Музыка), 'new' (Новинки), 'rock', 'electronic', 'hiphop'
   const [activeTab, setActiveTab] = useState<'yam' | 'new' | 'rock' | 'electronic' | 'hiphop'>('yam');
   const [tracks, setTracks] = useState<UnifiedTrack[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Selected Artist for Modal
+  const [selectedArtist, setSelectedArtist] = useState<ArtistData | null>(null);
 
   // Player state
   const [currentTrack, setCurrentTrack] = useState<UnifiedTrack | null>(null);
@@ -104,7 +166,7 @@ export default function HomePage() {
   };
 
   const handleNext = () => {
-    const list = searchResults.length > 0 ? searchResults : tracks;
+    const list = bottomNav === 'library' ? favorites : (searchResults.length > 0 ? searchResults : tracks);
     if (!list.length || !currentTrack) return;
     const currentIndex = list.findIndex((t) => t.id === currentTrack.id);
     const nextIndex = (currentIndex + 1) % list.length;
@@ -113,7 +175,7 @@ export default function HomePage() {
   };
 
   const handlePrev = () => {
-    const list = searchResults.length > 0 ? searchResults : tracks;
+    const list = bottomNav === 'library' ? favorites : (searchResults.length > 0 ? searchResults : tracks);
     if (!list.length || !currentTrack) return;
     const currentIndex = list.findIndex((t) => t.id === currentTrack.id);
     const prevIndex = (currentIndex - 1 + list.length) % list.length;
@@ -121,8 +183,11 @@ export default function HomePage() {
     setIsPlaying(true);
   };
 
-  const activeList = searchResults.length > 0 ? searchResults : tracks;
-  const featured = activeList[0];
+  const activeList = bottomNav === 'library'
+    ? favorites
+    : (searchResults.length > 0 ? searchResults : tracks);
+
+  const featured = activeList[0] || tracks[0];
 
   return (
     <div className="min-h-screen bg-[#F2F4F8] text-[#121316] pb-32 flex flex-col justify-between">
@@ -133,8 +198,12 @@ export default function HomePage() {
         <header className="flex items-center justify-between">
           <button
             onClick={() => {
-              setSearchResults([]);
-              setSearchQuery('');
+              if (searchResults.length > 0) {
+                setSearchResults([]);
+                setSearchQuery('');
+              } else if (bottomNav !== 'home') {
+                setBottomNav('home');
+              }
               setIsSearchOpen(false);
             }}
             className="w-11 h-11 rounded-2xl neu-btn flex items-center justify-center text-slate-700 hover:text-black transition-colors"
@@ -144,7 +213,7 @@ export default function HomePage() {
 
           <div className="flex items-center gap-2">
             <span className="font-extrabold text-lg tracking-tight text-slate-900">
-              MARS Music
+              {bottomNav === 'library' ? 'Избранное & Медиатека' : bottomNav === 'hotlist' ? 'Топ-чарты' : 'MARS Music'}
             </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#121316] text-white">
               YAM API
@@ -185,7 +254,7 @@ export default function HomePage() {
                 autoFocus
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Поиск по Яндекс Музыке, Apple Music, трекам мира..."
+                placeholder="Поиск по Яндекс Музыке, трекам мира, альбомам..."
                 className="w-full pl-11 pr-24 py-3 rounded-2xl neu-input text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all"
               />
               <button
@@ -202,7 +271,7 @@ export default function HomePage() {
         {/* =========================================================================
             ALBUM / FEATURED HEADER (Exact design matching Mockup Right Phone!)
            ========================================================================= */}
-        {!searchResults.length && featured && (
+        {!searchResults.length && bottomNav !== 'library' && featured && (
           <div className="flex items-start gap-5 pt-2">
             {/* Square Rounded Artwork */}
             <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl overflow-hidden shadow-[0_12px_28px_rgba(163,177,198,0.4)] border border-white flex-shrink-0">
@@ -216,7 +285,7 @@ export default function HomePage() {
             {/* Album Info & Action Icons */}
             <div className="flex-1 min-w-0 space-y-1">
               <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                Хит недели • 2026
+                Альбом • 2026
               </p>
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 truncate">
                 {featured.title}
@@ -258,14 +327,15 @@ export default function HomePage() {
               className="py-3.5 px-6 rounded-2xl bg-[#121316] text-white font-bold text-sm shadow-[0_8px_20px_rgba(18,19,22,0.35)] hover:bg-black active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
               <Play className="w-4 h-4 fill-current" />
-              <span>Play</span>
+              <span>{bottomNav === 'library' ? 'Play Favorites' : 'Play'}</span>
             </button>
 
             <button
               onClick={() => {
-                if (tracks.length > 1) {
-                  const randomIdx = Math.floor(Math.random() * tracks.length);
-                  handlePlayTrack(tracks[randomIdx]);
+                const list = bottomNav === 'library' ? favorites : tracks;
+                if (list.length > 1) {
+                  const randomIdx = Math.floor(Math.random() * list.length);
+                  handlePlayTrack(list[randomIdx]);
                 }
               }}
               className="py-3.5 px-6 rounded-2xl neu-flat text-slate-800 font-bold text-sm hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2"
@@ -276,9 +346,43 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* =========================================================================
+            КАРТОЧКИ МУЗЫКАНТОВ (Artist Cards Carousel on Home Screen)
+           ========================================================================= */}
+        {bottomNav === 'home' && !searchResults.length && (
+          <div className="space-y-3 pt-3">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="font-extrabold text-base text-slate-900">Популярные музыканты</h3>
+              <span className="text-xs font-bold text-slate-400">Все</span>
+            </div>
+
+            <div className="flex items-center gap-4 overflow-x-auto pb-2 scrollbar-none">
+              {POPULAR_ARTISTS.map((artist) => (
+                <div
+                  key={artist.id}
+                  onClick={() => setSelectedArtist(artist)}
+                  className="flex flex-col items-center gap-2 cursor-pointer group flex-shrink-0"
+                >
+                  <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-3xl overflow-hidden shadow-[0_8px_20px_rgba(163,177,198,0.35)] border border-white group-hover:scale-105 transition-transform duration-300">
+                    <img
+                      src={artist.avatarUrl}
+                      alt={artist.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="text-center w-24">
+                    <p className="font-bold text-xs text-slate-900 truncate">{artist.name}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{artist.genre.split('/')[0]}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Genre / Source Filter Pills */}
-        {!searchResults.length && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-2">
+        {!searchResults.length && bottomNav !== 'library' && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-1">
             {[
               { id: 'yam', label: '🔥 Яндекс Топ' },
               { id: 'new', label: '✨ Новинки' },
@@ -305,15 +409,30 @@ export default function HomePage() {
             TRACKLIST (Exact matching mockup tracklist rows!)
            ========================================================================= */}
         <div className="space-y-1 pt-2">
-          {isLoading && !searchResults.length ? (
+          {bottomNav === 'library' && (
+            <div className="flex items-center justify-between pb-2 px-1">
+              <h3 className="font-extrabold text-base text-slate-900">
+                Избранные треки ({favorites.length})
+              </h3>
+            </div>
+          )}
+
+          {isLoading && !searchResults.length && bottomNav !== 'library' ? (
             <div className="py-20 flex flex-col items-center justify-center text-slate-400 space-y-3">
               <Loader2 className="w-8 h-8 animate-spin text-[#121316]" />
               <p className="text-sm font-semibold">Загрузка музыки...</p>
             </div>
           ) : activeList.length === 0 ? (
-            <div className="py-16 text-center text-slate-400 neu-card rounded-3xl p-8">
-              <p className="text-slate-800 font-bold">Ничего не найдено</p>
-              <p className="text-xs mt-1">Попробуйте ввести другой поисковый запрос</p>
+            <div className="py-16 text-center text-slate-400 neu-card rounded-3xl p-8 space-y-2">
+              <Heart className="w-10 h-10 text-slate-300 mx-auto" />
+              <p className="text-slate-800 font-bold">
+                {bottomNav === 'library' ? 'У вас пока нет избранных треков' : 'Ничего не найдено'}
+              </p>
+              <p className="text-xs">
+                {bottomNav === 'library'
+                  ? 'Нажмите на сердечко на любом треке, чтобы добавить его сюда'
+                  : 'Попробуйте ввести другой поисковый запрос'}
+              </p>
             </div>
           ) : (
             activeList.map((track, idx) => (
@@ -341,6 +460,18 @@ export default function HomePage() {
         onNext={handleNext}
         onPrev={handlePrev}
         onSelectSource={handleSelectSource}
+      />
+
+      {/* =========================================================================
+          ARTIST PROFILE MODAL
+         ========================================================================= */}
+      <ArtistModal
+        artist={selectedArtist}
+        isOpen={!!selectedArtist}
+        onClose={() => setSelectedArtist(null)}
+        onPlayTrack={handlePlayTrack}
+        currentTrackId={currentTrack?.id}
+        isPlaying={isPlaying}
       />
 
       {/* =========================================================================
@@ -375,12 +506,18 @@ export default function HomePage() {
         </button>
 
         <button
-          onClick={() => setBottomNav('library')}
-          className={`flex flex-col items-center gap-1 transition-colors ${
+          onClick={() => {
+            setBottomNav('library');
+            setIsSearchOpen(false);
+          }}
+          className={`flex flex-col items-center gap-1 transition-colors relative ${
             bottomNav === 'library' ? 'text-[#121316] font-bold' : 'text-slate-400 hover:text-slate-700'
           }`}
         >
           <Library className="w-5 h-5" />
+          {favorites.length > 0 && (
+            <span className="absolute -top-1 right-2 w-2 h-2 rounded-full bg-red-500" />
+          )}
           <span className="text-[10px]">Library</span>
         </button>
 
@@ -388,6 +525,7 @@ export default function HomePage() {
           onClick={() => {
             setBottomNav('hotlist');
             setActiveTab('yam');
+            setIsSearchOpen(false);
           }}
           className={`flex flex-col items-center gap-1 transition-colors ${
             bottomNav === 'hotlist' ? 'text-[#121316] font-bold' : 'text-slate-400 hover:text-slate-700'

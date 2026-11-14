@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
+import { FavoritesProvider } from '@/context/FavoritesContext';
 
 export const metadata: Metadata = {
   title: 'MARS — Multi-Platform Music',
@@ -18,9 +19,11 @@ export default function RootLayout({
     <html lang="ru">
       <body className="bg-[#F2F4F8] text-[#121316] min-h-screen antialiased">
         <AuthProvider>
-          <main className="min-h-screen overflow-x-hidden">
-            {children}
-          </main>
+          <FavoritesProvider>
+            <main className="min-h-screen overflow-x-hidden">
+              {children}
+            </main>
+          </FavoritesProvider>
         </AuthProvider>
       </body>
     </html>

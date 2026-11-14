@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
-import { Play, Pause, MoreHorizontal, Layers, Heart } from 'lucide-react';
+import { Play, Pause, MoreHorizontal, Heart } from 'lucide-react';
 import { UnifiedTrack } from '@/types/music';
 import { formatDurationMs } from '@/lib/utils';
+import { useFavorites } from '@/context/FavoritesContext';
 
 interface TrackRowProps {
   track: UnifiedTrack;
@@ -22,6 +23,8 @@ export function TrackRow({
   onPlay,
   onSelectSource,
 }: TrackRowProps) {
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const liked = isFavorite(track.id) || isFavorite(track.title);
   const activeSource = track.sources[track.activeSourceIndex || 0];
   const formattedIndex = (index + 1 < 10 ? '0' : '') + (index + 1);
 
@@ -55,7 +58,7 @@ export function TrackRow({
           )}
         </div>
 
-        {/* Thumbnail (clean rounded-xl) */}
+        {/* Thumbnail */}
         <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-slate-200 flex-shrink-0 shadow-sm border border-slate-200/60">
           {track.artworkUrl ? (
             <img
@@ -100,8 +103,19 @@ export function TrackRow({
         </span>
       </div>
 
-      {/* Right: Actions */}
+      {/* Right: Heart & More */}
       <div className="flex items-center gap-2 flex-shrink-0 text-slate-400">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleFavorite(track);
+          }}
+          className="p-1 hover:text-red-500 transition-colors"
+          title={liked ? 'Удалить из избранного' : 'Добавить в избранное'}
+        >
+          <Heart className={`w-4 h-4 ${liked ? 'fill-red-500 text-red-500' : 'text-slate-300'}`} />
+        </button>
+
         <button
           onClick={(e) => {
             e.stopPropagation();
