@@ -10,26 +10,25 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        mars: {
-          dark: "#090A0F",
-          surface: "#11131B",
-          card: "#171A26",
-          border: "#252B3B",
-          hover: "#2A3246",
-          red: "#FF3823",
-          accent: "#FF4E36",
-          glow: "rgba(255, 78, 54, 0.25)",
-          gold: "#F59E0B",
-          muted: "#8E98B0",
-          text: "#F1F5F9"
+        neu: {
+          bg: "#F2F4F8",
+          surface: "#ECEFF4",
+          card: "#FFFFFF",
+          border: "#E2E8F0",
+          shadow: "#A3B1C6",
+          text: "#121316",
+          muted: "#8C92A4",
+          obsidian: "#121316",
         },
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        obsidian: {
+          DEFAULT: "#121316",
+          card: "#1B1C20",
+          hover: "#25272C",
+        },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        '3xl': '1.75rem',
+        '4xl': '2.25rem',
       },
     },
   },

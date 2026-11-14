@@ -48,6 +48,8 @@ Source: "e:\MARS\.env"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist
 ; Source files
 Source: "e:\MARS\public\*"; DestDir: "{app}\public"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "e:\MARS\src\*"; DestDir: "{app}\src"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "e:\MARS\electron\*"; DestDir: "{app}\electron"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "e:\MARS\node_modules\electron\dist\*"; DestDir: "{app}\node_modules\electron\dist"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "e:\MARS\prisma\schema.prisma"; DestDir: "{app}\prisma"; Flags: ignoreversion
 
 [Icons]

@@ -3,19 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import {
   Search,
-  Sparkles,
-  Radio,
   Play,
-  Layers,
+  Shuffle,
+  ChevronLeft,
+  Share2,
+  Download,
+  MoreHorizontal,
+  Home,
   Flame,
-  Music2,
-  TrendingUp,
-  Disc3,
-  Loader2,
+  Bookmark,
+  Library,
   User,
+  Sparkles,
+  Loader2,
   RefreshCw,
-  Globe2,
-  Compass,
 } from 'lucide-react';
 import { UnifiedTrack } from '@/types/music';
 import { TrackRow } from '@/components/track/TrackRow';
@@ -23,42 +24,45 @@ import { AudioPlayer } from '@/components/player/AudioPlayer';
 import { useAuth } from '@/context/AuthContext';
 
 export default function HomePage() {
-  const { user, openAuthModal, triggerSync, isSyncing, totalTracksInDb } = useAuth();
+  const { user, openAuthModal, triggerSync, isSyncing } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<UnifiedTrack[]>([]);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  // World Charts / New Releases state
-  const [activeTab, setActiveTab] = useState<'global' | 'ru' | 'rock' | 'electronic' | 'hiphop'>('global');
-  const [chartTracks, setChartTracks] = useState<UnifiedTrack[]>([]);
-  const [isLoadingChart, setIsLoadingChart] = useState(true);
+  // Active Tab: 'yam' (Яндекс Музыка), 'new' (Новинки), 'rock', 'electronic', 'hiphop'
+  const [activeTab, setActiveTab] = useState<'yam' | 'new' | 'rock' | 'electronic' | 'hiphop'>('yam');
+  const [tracks, setTracks] = useState<UnifiedTrack[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Player state
   const [currentTrack, setCurrentTrack] = useState<UnifiedTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // Load World Charts & New Releases
-  const loadChart = async (type: string) => {
+  // Bottom Navigation state: 'home' | 'search' | 'library' | 'hotlist'
+  const [bottomNav, setBottomNav] = useState<'home' | 'search' | 'library' | 'hotlist'>('home');
+
+  const loadFeed = async (type: string) => {
     try {
-      setIsLoadingChart(true);
+      setIsLoading(true);
       const res = await fetch(`/api/charts?type=${type}&limit=25`);
       if (res.ok) {
         const data = await res.json();
-        setChartTracks(data.tracks || []);
+        setTracks(data.tracks || []);
         if (data.tracks?.length > 0 && !currentTrack) {
           setCurrentTrack(data.tracks[0]);
         }
       }
     } catch (err) {
-      console.error('Failed to load chart:', err);
+      console.error('Failed to load feed:', err);
     } finally {
-      setIsLoadingChart(false);
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadChart(activeTab);
+    loadFeed(activeTab);
   }, [activeTab]);
 
   const handleSearch = async (e?: React.FormEvent) => {
@@ -76,7 +80,7 @@ export default function HomePage() {
         setSearchResults(data.tracks || []);
       }
     } catch (err) {
-      console.error('Search failed:', err);
+      console.error('Search error:', err);
     } finally {
       setIsSearching(false);
     }
@@ -100,7 +104,7 @@ export default function HomePage() {
   };
 
   const handleNext = () => {
-    const list = searchResults.length > 0 ? searchResults : chartTracks;
+    const list = searchResults.length > 0 ? searchResults : tracks;
     if (!list.length || !currentTrack) return;
     const currentIndex = list.findIndex((t) => t.id === currentTrack.id);
     const nextIndex = (currentIndex + 1) % list.length;
@@ -109,7 +113,7 @@ export default function HomePage() {
   };
 
   const handlePrev = () => {
-    const list = searchResults.length > 0 ? searchResults : chartTracks;
+    const list = searchResults.length > 0 ? searchResults : tracks;
     if (!list.length || !currentTrack) return;
     const currentIndex = list.findIndex((t) => t.id === currentTrack.id);
     const prevIndex = (currentIndex - 1 + list.length) % list.length;
@@ -117,192 +121,202 @@ export default function HomePage() {
     setIsPlaying(true);
   };
 
-  const activeTracksList = searchResults.length > 0 ? searchResults : chartTracks;
+  const activeList = searchResults.length > 0 ? searchResults : tracks;
+  const featured = activeList[0];
 
   return (
-    <div className="flex-1 p-6 lg:p-10 max-w-7xl mx-auto w-full space-y-8">
-      {/* Top Bar with Global Search & User Profile */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-2xl lg:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2">
-              <Globe2 className="w-7 h-7 text-mars-red" />
-              <span>MARS World Music</span>
-            </h2>
-            <span className="text-xs px-2.5 py-1 rounded-full bg-mars-red/20 text-mars-red border border-mars-red/30 uppercase tracking-widest font-mono">
-              100M+ ТРЕКОВ
-            </span>
-          </div>
-          <p className="text-mars-muted text-sm mt-1 flex items-center gap-2">
-            <span>Все треки и мировые новинки в одном интерфейсе</span>
-            <span className="text-mars-border">•</span>
-            <span className="text-emerald-400 font-mono text-xs">{totalTracksInDb} треков в локальной базе</span>
-          </p>
-        </div>
-
-        {/* Search Bar across all world tracks */}
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <form
-            onSubmit={handleSearch}
-            className="relative flex-1 md:w-96 flex items-center"
-          >
-            <Search className="w-4 h-4 text-mars-muted absolute left-4" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Поиск любых треков мира, артистов, альбомов..."
-              className="w-full pl-11 pr-24 py-2.5 rounded-xl bg-mars-surface border border-mars-border text-sm text-white placeholder-mars-muted focus:outline-none focus:border-mars-red transition-all shadow-inner"
-            />
-            <button
-              type="submit"
-              disabled={isSearching}
-              className="absolute right-2 px-3 py-1 rounded-lg bg-mars-red text-white text-xs font-semibold hover:bg-orange-600 transition-colors flex items-center gap-1.5"
-            >
-              {isSearching ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                'Найти'
-              )}
-            </button>
-          </form>
-
+    <div className="min-h-screen bg-[#F2F4F8] text-[#121316] pb-32 flex flex-col justify-between">
+      <div className="max-w-2xl mx-auto w-full px-5 py-6 space-y-6">
+        {/* =========================================================================
+            TOP BAR: Back arrow on left, Title in center, Search & Profile on right
+           ========================================================================= */}
+        <header className="flex items-center justify-between">
           <button
-            onClick={triggerSync}
-            disabled={isSyncing}
-            className="p-2.5 rounded-xl bg-mars-surface hover:bg-mars-card border border-mars-border text-mars-muted hover:text-white transition-all flex-shrink-0"
-            title="Синхронизировать базу с мировыми источниками"
+            onClick={() => {
+              setSearchResults([]);
+              setSearchQuery('');
+              setIsSearchOpen(false);
+            }}
+            className="w-11 h-11 rounded-2xl neu-btn flex items-center justify-center text-slate-700 hover:text-black transition-colors"
           >
-            <RefreshCw className={`w-4 h-4 text-mars-red ${isSyncing ? 'animate-spin' : ''}`} />
+            <ChevronLeft className="w-6 h-6" />
           </button>
 
-          {!user && (
-            <button
-              onClick={openAuthModal}
-              className="md:hidden px-3 py-2 rounded-xl bg-mars-red text-white text-xs font-semibold flex items-center gap-1.5 flex-shrink-0"
-            >
-              <User className="w-3.5 h-3.5" />
-              <span>Войти</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Featured Banner / Yandex Music Style Hero */}
-      {!searchResults.length && chartTracks.length > 0 && (
-        <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-mars-surface via-mars-card to-zinc-950 border border-mars-border p-6 lg:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl">
-          <div className="space-y-4 max-w-xl z-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-mars-red/20 text-mars-red text-xs font-bold uppercase tracking-wider border border-mars-red/30">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Главная музыкальная новинка</span>
-            </div>
-            <h1 className="text-3xl lg:text-4xl font-black text-white leading-tight">
-              {chartTracks[0]?.title} — {chartTracks[0]?.artistName}
-            </h1>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Слушайте мировой топ-релиз в студийном качестве с выбором источника воспроизведения (Apple Music, YouTube, SoundCloud).
-            </p>
-            <div className="flex flex-wrap items-center gap-3 pt-2">
-              <button
-                onClick={() => handlePlayTrack(chartTracks[0])}
-                className="px-6 py-3 rounded-xl bg-mars-red text-white font-semibold text-sm flex items-center gap-2 hover:bg-orange-600 active:scale-95 transition-all mars-glow shadow-lg"
-              >
-                <Play className="w-4 h-4 fill-current" />
-                <span>Слушать прямо сейчас</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  if (chartTracks.length > 1) handlePlayTrack(chartTracks[1]);
-                }}
-                className="px-4 py-3 rounded-xl bg-mars-surface hover:bg-mars-hover border border-mars-border text-xs text-slate-200 font-semibold flex items-center gap-2 transition-all"
-              >
-                <span>Следующий хит</span>
-              </button>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="font-extrabold text-lg tracking-tight text-slate-900">
+              MARS Music
+            </span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#121316] text-white">
+              YAM API
+            </span>
           </div>
 
-          <div className="flex items-center justify-center relative w-48 h-48 md:w-60 md:h-60 flex-shrink-0">
-            <div className="w-48 h-48 rounded-full bg-mars-red/20 blur-3xl absolute" />
-            <img
-              src={chartTracks[0]?.artworkUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500'}
-              alt={chartTracks[0]?.title}
-              className="w-44 h-44 md:w-52 md:h-52 rounded-2xl object-cover shadow-2xl border border-mars-border relative z-10 transform hover:scale-105 transition-transform"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Global Charts & New Releases Tabs (Yandex Music Style) */}
-      {!searchResults.length && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none border-b border-mars-border/60">
-          {[
-            { id: 'global', label: '🔥 Мировой топ-50' },
-            { id: 'ru', label: '🇷🇺 Топ новинки' },
-            { id: 'electronic', label: '⚡ Электроника' },
-            { id: 'rock', label: '🎸 Рок & Альтернатива' },
-            { id: 'hiphop', label: '🎤 Хип-Хоп' },
-          ].map((tab) => (
+          <div className="flex items-center gap-2">
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                activeTab === tab.id
-                  ? 'bg-mars-red text-white shadow-lg shadow-mars-red/20'
-                  : 'bg-mars-surface hover:bg-mars-card text-mars-muted hover:text-white border border-mars-border'
-              }`}
+              onClick={() => setIsSearchOpen(!isSearchOpen)}
+              className="w-11 h-11 rounded-2xl neu-btn flex items-center justify-center text-slate-700 hover:text-black transition-colors"
             >
-              {tab.label}
+              <Search className="w-5 h-5" />
             </button>
-          ))}
-        </div>
-      )}
 
-      {/* Tracks Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            {searchResults.length > 0 ? (
-              <>
-                <TrendingUp className="w-5 h-5 text-mars-red" />
-                <span>Результаты глобального поиска ({searchResults.length})</span>
-              </>
+            {user ? (
+              <div className="w-10 h-10 rounded-2xl bg-[#121316] text-white text-xs font-bold flex items-center justify-center shadow-md">
+                {user.name?.[0]?.toUpperCase() || 'U'}
+              </div>
             ) : (
-              <>
-                <Flame className="w-5 h-5 text-mars-red" />
-                <span>Свежие мировые релизы и чарты</span>
-              </>
+              <button
+                onClick={openAuthModal}
+                className="w-10 h-10 rounded-2xl neu-btn flex items-center justify-center text-slate-700 hover:text-black"
+                title="Войти"
+              >
+                <User className="w-4 h-4" />
+              </button>
             )}
-          </h3>
+          </div>
+        </header>
 
-          {searchResults.length > 0 && (
+        {/* Search Bar Input (Animated / Expandable) */}
+        {isSearchOpen && (
+          <form onSubmit={handleSearch} className="animate-fadeIn">
+            <div className="relative flex items-center">
+              <Search className="w-4 h-4 text-slate-400 absolute left-4" />
+              <input
+                type="text"
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Поиск по Яндекс Музыке, Apple Music, трекам мира..."
+                className="w-full pl-11 pr-24 py-3 rounded-2xl neu-input text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all"
+              />
+              <button
+                type="submit"
+                disabled={isSearching}
+                className="absolute right-2 px-3.5 py-1.5 rounded-xl bg-[#121316] text-white text-xs font-bold hover:bg-black transition-colors"
+              >
+                {isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Найти'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* =========================================================================
+            ALBUM / FEATURED HEADER (Exact design matching Mockup Right Phone!)
+           ========================================================================= */}
+        {!searchResults.length && featured && (
+          <div className="flex items-start gap-5 pt-2">
+            {/* Square Rounded Artwork */}
+            <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl overflow-hidden shadow-[0_12px_28px_rgba(163,177,198,0.4)] border border-white flex-shrink-0">
+              <img
+                src={featured.artworkUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500'}
+                alt={featured.title}
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            {/* Album Info & Action Icons */}
+            <div className="flex-1 min-w-0 space-y-1">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                Хит недели • 2026
+              </p>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 truncate">
+                {featured.title}
+              </h1>
+              <p className="text-sm font-semibold text-slate-400 truncate">
+                {featured.artistName}
+              </p>
+
+              {/* Action Icons Pill: Share, Download, More (from mockup) */}
+              <div className="flex items-center gap-2 pt-2 text-slate-700">
+                <button
+                  onClick={triggerSync}
+                  className="p-1.5 rounded-xl hover:bg-slate-200 transition-colors"
+                  title="Синхронизировать каталог"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-black' : ''}`} />
+                </button>
+                <button className="p-1.5 rounded-xl hover:bg-slate-200 transition-colors" title="Поделиться">
+                  <Share2 className="w-4 h-4" />
+                </button>
+                <button className="p-1.5 rounded-xl hover:bg-slate-200 transition-colors" title="Сохранить">
+                  <Download className="w-4 h-4" />
+                </button>
+                <button className="p-1.5 rounded-xl hover:bg-slate-200 transition-colors" title="Еще">
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            BIG ACTION BUTTONS: ▶ Play & 🔀 Shuffle (Exact from Mockup)
+           ========================================================================= */}
+        {!searchResults.length && featured && (
+          <div className="grid grid-cols-2 gap-4 pt-1">
+            <button
+              onClick={() => handlePlayTrack(featured)}
+              className="py-3.5 px-6 rounded-2xl bg-[#121316] text-white font-bold text-sm shadow-[0_8px_20px_rgba(18,19,22,0.35)] hover:bg-black active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            >
+              <Play className="w-4 h-4 fill-current" />
+              <span>Play</span>
+            </button>
+
             <button
               onClick={() => {
-                setSearchQuery('');
-                setSearchResults([]);
+                if (tracks.length > 1) {
+                  const randomIdx = Math.floor(Math.random() * tracks.length);
+                  handlePlayTrack(tracks[randomIdx]);
+                }
               }}
-              className="text-xs text-mars-red hover:underline"
+              className="py-3.5 px-6 rounded-2xl neu-flat text-slate-800 font-bold text-sm hover:shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
-              Вернуться к чартам
+              <Shuffle className="w-4 h-4" />
+              <span>Shuffle</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Tracks List */}
-        {isLoadingChart && !searchResults.length ? (
-          <div className="py-20 flex flex-col items-center justify-center text-mars-muted space-y-3">
-            <Loader2 className="w-8 h-8 animate-spin text-mars-red" />
-            <p className="text-sm">Загрузка мировых новинок...</p>
+        {/* Genre / Source Filter Pills */}
+        {!searchResults.length && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-2">
+            {[
+              { id: 'yam', label: '🔥 Яндекс Топ' },
+              { id: 'new', label: '✨ Новинки' },
+              { id: 'rock', label: '🎸 Рок' },
+              { id: 'electronic', label: '⚡ Электроника' },
+              { id: 'hiphop', label: '🎤 Рэп' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all ${
+                  activeTab === tab.id
+                    ? 'bg-[#121316] text-white shadow-md'
+                    : 'neu-btn text-slate-600 hover:text-black'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
-        ) : activeTracksList.length === 0 ? (
-          <div className="py-16 text-center text-mars-muted bg-mars-surface/50 rounded-2xl border border-mars-border p-8">
-            <Music2 className="w-12 h-12 text-mars-muted/40 mx-auto mb-3" />
-            <p className="text-white font-medium">Ничего не найдено</p>
-            <p className="text-xs mt-1">Попробуйте ввести другой поисковый запрос</p>
-          </div>
-        ) : (
-          <div className="bg-mars-card/40 rounded-2xl border border-mars-border p-3 space-y-1">
-            {activeTracksList.map((track, idx) => (
+        )}
+
+        {/* =========================================================================
+            TRACKLIST (Exact matching mockup tracklist rows!)
+           ========================================================================= */}
+        <div className="space-y-1 pt-2">
+          {isLoading && !searchResults.length ? (
+            <div className="py-20 flex flex-col items-center justify-center text-slate-400 space-y-3">
+              <Loader2 className="w-8 h-8 animate-spin text-[#121316]" />
+              <p className="text-sm font-semibold">Загрузка музыки...</p>
+            </div>
+          ) : activeList.length === 0 ? (
+            <div className="py-16 text-center text-slate-400 neu-card rounded-3xl p-8">
+              <p className="text-slate-800 font-bold">Ничего не найдено</p>
+              <p className="text-xs mt-1">Попробуйте ввести другой поисковый запрос</p>
+            </div>
+          ) : (
+            activeList.map((track, idx) => (
               <TrackRow
                 key={track.id}
                 track={track}
@@ -312,12 +326,14 @@ export default function HomePage() {
                 onPlay={() => handlePlayTrack(track)}
                 onSelectSource={handleSelectSource}
               />
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
       </div>
 
-      {/* Persistent Audio Player */}
+      {/* =========================================================================
+          PERSISTENT AUDIO PLAYER (Floating black pill + Expanded Now Playing)
+         ========================================================================= */}
       <AudioPlayer
         currentTrack={currentTrack}
         isPlaying={isPlaying}
@@ -326,6 +342,61 @@ export default function HomePage() {
         onPrev={handlePrev}
         onSelectSource={handleSelectSource}
       />
+
+      {/* =========================================================================
+          BOTTOM DOCK NAVIGATION BAR (Exact matching Mockup Bottom Bar!)
+         ========================================================================= */}
+      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#F2F4F8]/90 backdrop-blur-lg border-t border-slate-200/60 px-8 flex items-center justify-around z-30 max-w-2xl mx-auto">
+        <button
+          onClick={() => {
+            setBottomNav('home');
+            setSearchResults([]);
+            setIsSearchOpen(false);
+          }}
+          className={`flex flex-col items-center gap-1 transition-colors ${
+            bottomNav === 'home' ? 'text-[#121316] font-bold' : 'text-slate-400 hover:text-slate-700'
+          }`}
+        >
+          <Home className="w-5 h-5" />
+          <span className="text-[10px]">Home</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setBottomNav('search');
+            setIsSearchOpen(true);
+          }}
+          className={`flex flex-col items-center gap-1 transition-colors ${
+            bottomNav === 'search' ? 'text-[#121316] font-bold' : 'text-slate-400 hover:text-slate-700'
+          }`}
+        >
+          <Search className="w-5 h-5" />
+          <span className="text-[10px]">Search</span>
+        </button>
+
+        <button
+          onClick={() => setBottomNav('library')}
+          className={`flex flex-col items-center gap-1 transition-colors ${
+            bottomNav === 'library' ? 'text-[#121316] font-bold' : 'text-slate-400 hover:text-slate-700'
+          }`}
+        >
+          <Library className="w-5 h-5" />
+          <span className="text-[10px]">Library</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setBottomNav('hotlist');
+            setActiveTab('yam');
+          }}
+          className={`flex flex-col items-center gap-1 transition-colors ${
+            bottomNav === 'hotlist' ? 'text-[#121316] font-bold' : 'text-slate-400 hover:text-slate-700'
+          }`}
+        >
+          <Flame className="w-5 h-5" />
+          <span className="text-[10px]">Hotlist</span>
+        </button>
+      </nav>
     </div>
   );
 }

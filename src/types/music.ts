@@ -1,4 +1,4 @@
-export type ProviderId = 'jamendo' | 'soundcloud' | 'apple_music' | 'youtube' | 'spotify';
+export type ProviderId = 'jamendo' | 'soundcloud' | 'apple_music' | 'youtube' | 'spotify' | 'yandex';
 
 export type PlaybackType = 'direct_stream' | 'iframe_widget' | 'sdk_bridge' | 'external_url';
 

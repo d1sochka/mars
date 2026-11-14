@@ -21,11 +21,8 @@ namespace MarsApp
             // 1. Check if server is already running
             bool isRunning = IsServerOnline(appUrl);
 
-            Process serverProcess = null;
-
             if (!isRunning)
             {
-                // Start background Node.js server
                 string nodePath = FindNodeBinary();
                 string serverScript = Path.Combine(baseDir, "node_modules", "next", "dist", "bin", "next");
 
@@ -41,7 +38,7 @@ namespace MarsApp
                         psi.UseShellExecute = false;
                         psi.WindowStyle = ProcessWindowStyle.Hidden;
 
-                        serverProcess = Process.Start(psi);
+                        Process.Start(psi);
                     }
                     catch (Exception ex)
                     {
@@ -61,8 +58,8 @@ namespace MarsApp
                 }
             }
 
-            // 2. Launch Dedicated Desktop Window
-            LaunchDesktopWindow(appUrl);
+            // 2. Launch Dedicated Native Desktop Application Window via Electron
+            LaunchNativeElectronWindow(baseDir, appUrl);
         }
 
         static bool IsServerOnline(string url)
@@ -83,8 +80,23 @@ namespace MarsApp
             }
         }
 
-        static void LaunchDesktopWindow(string url)
+        static void LaunchNativeElectronWindow(string baseDir, string url)
         {
+            string electronExe = Path.Combine(baseDir, "node_modules", "electron", "dist", "electron.exe");
+            string mainScript = Path.Combine(baseDir, "electron", "main.js");
+
+            if (File.Exists(electronExe) && File.Exists(mainScript))
+            {
+                ProcessStartInfo psi = new ProcessStartInfo();
+                psi.FileName = electronExe;
+                psi.Arguments = string.Format("\"{0}\"", mainScript);
+                psi.WorkingDirectory = baseDir;
+                psi.UseShellExecute = false;
+                Process.Start(psi);
+                return;
+            }
+
+            // Fallback to Edge in App mode if Electron binary is missing
             string edgePath = @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe";
             if (!File.Exists(edgePath))
             {
@@ -95,7 +107,6 @@ namespace MarsApp
 
             if (File.Exists(edgePath))
             {
-                // Launch Edge in dedicated Frameless / App mode
                 ProcessStartInfo psi = new ProcessStartInfo();
                 psi.FileName = edgePath;
                 psi.Arguments = string.Format("--app=\"{0}\" --user-data-dir=\"{1}\" --window-size=1360,860", url, profileDir);
@@ -103,7 +114,6 @@ namespace MarsApp
             }
             else
             {
-                // Fallback to default browser
                 Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
             }
         }

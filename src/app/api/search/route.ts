@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { JamendoProvider } from '@/lib/providers/jamendo';
 import { SoundCloudProvider } from '@/lib/providers/soundcloud';
 import { AppleCatalogProvider } from '@/lib/providers/itunes';
+import { YandexMusicProvider } from '@/lib/providers/yam';
 import { mergeTracks } from '@/lib/matching';
 import { ProviderId, SearchResult } from '@/types/music';
 import { ingestTracks } from '@/lib/sync/ingestion';
@@ -9,6 +10,7 @@ import { ingestTracks } from '@/lib/sync/ingestion';
 const jamendo = new JamendoProvider();
 const soundcloud = new SoundCloudProvider();
 const appleMusic = new AppleCatalogProvider();
+const yam = new YandexMusicProvider();
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -25,17 +27,18 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const providersQueried: ProviderId[] = ['apple_music', 'jamendo', 'soundcloud', 'youtube'];
+    const providersQueried: ProviderId[] = ['yandex', 'apple_music', 'jamendo', 'soundcloud', 'youtube'];
 
     // Parallel fetch from all providers covering global music library!
-    const [appleTracks, jamendoTracks, soundcloudTracks] = await Promise.all([
+    const [yamTracks, appleTracks, jamendoTracks, soundcloudTracks] = await Promise.all([
+      yam.search(query, limit).catch(() => []),
       appleMusic.search(query, limit).catch(() => []),
       jamendo.search(query, limit).catch(() => []),
       soundcloud.search(query, limit).catch(() => []),
     ]);
 
     // Cross-source matching and deduplication
-    const unifiedTracks = mergeTracks([appleTracks, jamendoTracks, soundcloudTracks]);
+    const unifiedTracks = mergeTracks([yamTracks, appleTracks, jamendoTracks, soundcloudTracks]);
 
     // Asynchronously auto-ingest into platform database
     if (unifiedTracks.length > 0) {

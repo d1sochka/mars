@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Play, Pause, Heart, Layers, ExternalLink } from 'lucide-react';
+import { Play, Pause, MoreHorizontal, Layers, Heart } from 'lucide-react';
 import { UnifiedTrack } from '@/types/music';
 import { formatDurationMs } from '@/lib/utils';
 
@@ -23,35 +23,40 @@ export function TrackRow({
   onSelectSource,
 }: TrackRowProps) {
   const activeSource = track.sources[track.activeSourceIndex || 0];
+  const formattedIndex = (index + 1 < 10 ? '0' : '') + (index + 1);
 
   return (
     <div
-      className={`group flex items-center justify-between p-3 rounded-xl transition-all ${
+      onClick={onPlay}
+      className={`group flex items-center justify-between py-3.5 px-4 rounded-2xl cursor-pointer transition-all ${
         isCurrent
-          ? 'bg-mars-red/10 border border-mars-red/30'
-          : 'hover:bg-mars-surface border border-transparent hover:border-mars-border'
+          ? 'bg-white shadow-[0_4px_16px_rgba(163,177,198,0.25)] border border-slate-200/80'
+          : 'hover:bg-white/60 hover:shadow-sm border border-transparent'
       }`}
     >
-      {/* Left: Index / Play Button & Artwork & Title */}
+      {/* Left: Index / Animated Equalizer & Title / Artist */}
       <div className="flex items-center gap-4 min-w-0 flex-1">
+        {/* Index or Equalizer */}
         <div className="w-8 flex items-center justify-center flex-shrink-0">
-          <button
-            onClick={onPlay}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-              isCurrent && isPlaying
-                ? 'bg-mars-red text-white'
-                : 'text-mars-muted group-hover:text-white group-hover:bg-mars-card'
-            }`}
-          >
-            {isCurrent && isPlaying ? (
-              <Pause className="w-4 h-4 fill-current" />
-            ) : (
-              <Play className="w-4 h-4 fill-current ml-0.5" />
-            )}
-          </button>
+          {isCurrent && isPlaying ? (
+            <div className="flex items-end gap-0.5 h-4 w-4 justify-center">
+              <span className="w-1 bg-[#121316] rounded-full animate-eq-1" />
+              <span className="w-1 bg-[#121316] rounded-full animate-eq-2" />
+              <span className="w-1 bg-[#121316] rounded-full animate-eq-3" />
+            </div>
+          ) : (
+            <span
+              className={`font-mono text-xs font-semibold ${
+                isCurrent ? 'text-[#121316] font-bold' : 'text-slate-400 group-hover:text-slate-600'
+              }`}
+            >
+              {formattedIndex}
+            </span>
+          )}
         </div>
 
-        <div className="relative w-11 h-11 rounded-lg overflow-hidden bg-mars-card flex-shrink-0 border border-mars-border">
+        {/* Thumbnail (clean rounded-xl) */}
+        <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-slate-200 flex-shrink-0 shadow-sm border border-slate-200/60">
           {track.artworkUrl ? (
             <img
               src={track.artworkUrl}
@@ -59,59 +64,52 @@ export function TrackRow({
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="w-full h-full bg-mars-surface flex items-center justify-center text-mars-muted text-xs font-bold">
+            <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-400 text-xs font-bold">
               ♪
             </div>
           )}
         </div>
 
-        <div className="min-w-0 flex-1 pr-2">
+        {/* Title and Artist + Duration */}
+        <div className="min-w-0 flex-1 pr-3">
           <div className="flex items-center gap-2">
             <p
-              className={`font-medium text-sm truncate ${
-                isCurrent ? 'text-mars-red font-semibold' : 'text-white'
+              className={`font-bold text-sm truncate ${
+                isCurrent ? 'text-black' : 'text-slate-800'
               }`}
             >
               {track.title}
             </p>
             {track.explicit && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-mars-red/20 text-mars-red border border-mars-red/40">
-                EXPLICIT
-              </span>
-            )}
-            {track.versionType && track.versionType !== 'original' && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-mars-card text-mars-muted uppercase">
-                {track.versionType}
+              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200 text-slate-600">
+                E
               </span>
             )}
           </div>
-          <p className="text-xs text-mars-muted truncate">{track.artistName}</p>
+          <p className="text-xs text-slate-400 font-medium truncate mt-0.5">
+            {track.artistName} • {formatDurationMs(track.durationMs)}
+          </p>
         </div>
       </div>
 
-      {/* Middle: Sources Badges (The core feature of MARS: Multi-Platform Aggregation!) */}
-      <div className="hidden sm:flex items-center gap-2 flex-shrink-0 px-4">
-        <div className="flex items-center gap-1.5 bg-mars-card px-2.5 py-1 rounded-lg border border-mars-border text-[11px]">
-          <Layers className="w-3.5 h-3.5 text-mars-red" />
-          <span className="text-white font-medium">
-            {activeSource?.providerName || 'Источник'}
-          </span>
-          {track.sources.length > 1 && (
-            <span className="text-mars-red font-bold text-[10px] ml-0.5">
-              +{track.sources.length - 1}
-            </span>
-          )}
-        </div>
+      {/* Middle: Source Badge */}
+      <div className="hidden sm:flex items-center gap-2 flex-shrink-0 px-3">
+        <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/60">
+          {activeSource?.providerName || 'Источник'}
+          {track.sources.length > 1 && ` +${track.sources.length - 1}`}
+        </span>
       </div>
 
-      {/* Right: Duration & Actions */}
-      <div className="flex items-center gap-3 text-xs text-mars-muted font-mono flex-shrink-0">
-        <span>{formatDurationMs(track.durationMs)}</span>
+      {/* Right: Actions */}
+      <div className="flex items-center gap-2 flex-shrink-0 text-slate-400">
         <button
-          className="text-mars-muted hover:text-mars-red p-1 transition-colors"
-          title="Добавить в избранное"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+          className="p-1 text-slate-300 hover:text-slate-700 transition-colors"
+          title="Действия"
         >
-          <Heart className="w-4 h-4" />
+          <MoreHorizontal className="w-5 h-5" />
         </button>
       </div>
     </div>
